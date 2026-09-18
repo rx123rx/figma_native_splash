@@ -1,0 +1,23 @@
+name: figma_native_splash
+description: Generate native Android, iOS, and HarmonyOS splash screens from Figma designs, with versioned snapshots and offline generation.
+version: 0.1.0
+environment:
+  sdk: '>=3.8.0 <4.0.0'
+dependencies:
+  args: ^2.7.0
+  crypto: ^3.0.6
+  http: ^1.4.0
+  image: ^4.5.4
+  path: ^1.9.1
+  xml: ^6.5.0
+  yaml: ^3.1.3
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.15
+executables:
+  figma_native_splash: figma_native_splash
+topics:
+  - flutter
+  - figma
+  - splash-screen
+  - code-generation

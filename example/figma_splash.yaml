@@ -1,0 +1,114 @@
+# 选填，整数，默认 1。目前只接受 1。
+# 省略：按当前配置格式解析。填写其他数字、字符串或 null：报错。
+schema_version: 1
+
+# 必填，映射。整个 figma 省略、为 null 或类型错误：报错。
+# 这里只支持 Figma 来源，没有本地图片输入配置。
+figma:
+  # 必填。接受「URL 字符串」或下方这种「url + nodes 映射」。
+  # 省略 phone：报错，不会拿 tablet 自动代替手机稿。
+  phone:
+    # 对象写法下必填，非空字符串。
+    # 必须是 https://figma.com 或 https://www.figma.com 的 design/file 链接，
+    # 并带有 node-id；节点应为 Frame、Component 或 Instance 画板。
+    # 省略/无 node-id/错误域名/错误类型：报错。
+    url: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2"
+
+    # 选填，映射；用于不想改图层名字的旧设计稿。
+    # 省略 nodes 或传 {}：三个角色均按 splash/<角色名> 自动查找。
+    # 可以只映射其中一个角色，其他角色仍按名称查找。
+    # 一旦指定某个角色的 ID，就只按 ID 查找，不再回退到名字。
+    nodes:
+      # 选填，字符串节点 ID，支持 "10:1" 或 "10-1"。
+      # 省略：查找唯一可见的 splash/background 图层。
+      # 该图层必须属于当前画板，且容器边界覆盖整个画板。
+      background: "10:1"
+
+      # 选填，字符串节点 ID。
+      # 省略：查找唯一可见的 splash/foreground 图层。
+      # 导出主文案及装饰；图片保持宽高比，不能混入状态栏截图。
+      foreground: "10:2"
+
+      # 选填，字符串节点 ID。
+      # 省略：查找唯一可见的 splash/branding 图层。
+      # 导出底部 Logo、名称和标语；不填写 ID 不代表省略品牌图层。
+      branding: "10:3"
+
+  # 选填，类型和 phone 完全相同，支持 URL 简写或对象写法。
+  # 省略：复用手机稿素材与参考尺寸；宽屏会适配，但不会凭空生成 Pad 设计，
+  # 主视觉/品牌的最大参考宽度仍受手机稿限制。
+  # 若提供 tablet，它的 url 在对象写法下必填，nodes 仍是选填。
+  tablet:
+    url: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-3"
+    nodes:
+      # 这三个节点必须属于 tablet 链接指向的画板，而不是手机画板。
+      # 逐项省略时，分别回退为该画板内的 splash/background、
+      # splash/foreground、splash/branding 名称查找。
+      background: "20:1"
+      foreground: "20:2"
+      branding: "20:3"
+
+# 选填，非空字符串列表，默认 [android, ios, ohos]。
+# 仅接受 android、ios、ohos；重复项会合并。
+# 省略：check/create 默认处理三个平台，缺少任意平台工程时会报错。
+# 只有 Android/iOS 工程时请写 [android, ios]，只有鸿蒙则写 [ohos]。
+# 此项控制原生生成范围，不减少 sync 下载的设计画板或图层。
+platforms: [android, ios, ohos]
+
+# 选填，非空字符串，默认 figma_splash。
+# 只允许小写英文字母开头，后续为小写字母、数字、下划线。
+# 用作生成的资源名及 iOS Storyboard 名字前缀，降低已有文件重名风险。
+# 省略：使用 figma_splash。不能用包名中的点号、连字符或大写字母。
+# 第一次生成后改这个值会被拒绝，需要先显式迁移旧资源与生成清单。
+# 它不会修改 App 包名、Bundle ID、鸿蒙 builder 类名或快照目录。
+resource_prefix: figma_splash
+
+# 选填，字符串，默认 "#FFFFFF"。必须加引号，且仅接受 #RRGGBB。
+# 省略：Android 12+ / 鸿蒙系统启动窗口使用白色底色，透明图层也以白色打底。
+# 不会从 Figma 自动吸取颜色。Android 12+ 的系统窗口只能使用纯色背景。
+# 同时用于部分平台启动区域/系统栏底色和构图预览，不会改 App 内主题。
+# 不支持 #RGB、#AARRGGBB、透明色或渐变字符串。
+background_color: "#FFFFFF"
+
+# 选填，映射。省略整个 ohos 等价于 app_splash: false。
+# platforms 未启用 ohos 时，该设置不产生鸿蒙文件。
+ohos:
+  # 选填，布尔值，默认 false；只能写 true/false，不能加引号。
+  # false/省略：仅配置鸿蒙系统启动窗口，不添加第二阶段分层宣传图。
+  # true：额外接入 FlutterPage.splashScreenView，在 Flutter 首帧前显示宣传图。
+  # 不添加固定展示时长；系统窗口何时消失仍由系统和引擎控制。
+  # 从 true 改成 false 并重新 create：清理本工具生成的 builder、引用及分层资源，
+  # 保留系统图标和背景。项目原有自定义 builder 不会被关闭操作删除。
+  app_splash: false
+
+# 选填，映射；标准 Flutter 工程可以整个省略。
+# 以下路径均相对于 --project 指定的项目根目录，而不是 YAML 文件所在目录。
+# 路径必须为项目内的非空相对路径，不允许绝对路径、../ 越界或反斜杠。
+# 工具拒绝经过符号链接的输出路径。
+project:
+  # 选填，默认 android/app/src/main/res。
+  # Android 资源根目录；其中 values/styles.xml 必须有唯一 LaunchTheme。
+  # 省略：使用标准路径。多 flavor 工程需要自行选择要修改的资源目录。
+  android_res: android/app/src/main/res
+
+  # 选填，默认 ios/Runner。
+  # iOS Runner 目录；必须有 Info.plist，工具会写入其 Assets.xcassets / Base.lproj。
+  # 省略：使用标准 Runner。不是 .xcodeproj 路径，也不是整个 ios 根目录。
+  ios_runner: ios/Runner
+
+  # 选填，默认 ohos/entry/src/main。
+  # 鸿蒙模块 main 目录，必须包含 module.json5；媒体资源写入 resources/base。
+  # 省略：使用标准 entry 模块。
+  # 修改此项不会自动修改下面的 ohos_page，两项默认值彼此独立。
+  ohos_main: ohos/entry/src/main
+
+  # 选填，默认 ohos/entry/src/main/ets/pages/Index.ets。
+  # app_splash=true 时必须存在，且包含唯一 FlutterPage({...}) 调用。
+  # app_splash=false 的新工程可以没有此文件；关闭已有接入时会检查并移除本工具引用。
+  # 省略：使用标准入口页。自定义模块/入口页时，应和 ohos_main 一起设置。
+  ohos_page: ohos/entry/src/main/ets/pages/Index.ets
+
+  # 选填，非空字符串，默认 EntryAbility。
+  # 必须对应 module.json5 中可唯一定位的 Ability name；不是包名或文件路径。
+  # 省略：查找 EntryAbility。找不到/不唯一：报错，不猜测使用其他 Ability。
+  ohos_ability: EntryAbility

@@ -1,0 +1,7 @@
+.dart_tool/
+coverage/
+.DS_Store
+.env
+.hvigor/
+.pub/
+.env.*

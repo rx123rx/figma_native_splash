@@ -1,0 +1,11 @@
+.dart_tool/
+.git/
+.hvigor/
+.pub/
+coverage/
+build/
+.DS_Store
+.env
+.env.*
+*.log
+pubspec.lock
