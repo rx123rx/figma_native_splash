@@ -90,6 +90,9 @@ Future<void> runCli(List<String> arguments, {String? command}) async {
       platforms: platform == null ? null : [platform],
     );
     if (action == 'check') {
+      if (plan.integrationIssues.isNotEmpty) {
+        throw SplashException(plan.integrationIssues.join('\n'));
+      }
       stdout.writeln(
         '配置、素材哈希、工程接入和输出冲突检查通过；待更新文件 ${plan.changes.length} 个。未修改工程。',
       );

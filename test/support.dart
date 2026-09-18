@@ -67,6 +67,7 @@ void write(Directory root, String path, String text) {
 }
 
 void projectFixture(Directory root) {
+  write(root, 'ios/Runner.xcodeproj/project.pbxproj', xcodeFixture);
   write(root, 'android/app/src/main/res/values/styles.xml', '''<resources>
 <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar"><item name="android:windowFullscreen">false</item></style>
 <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar"><item name="android:windowBackground">?android:colorBackground</item></style>
@@ -86,6 +87,65 @@ void projectFixture(Directory root) {
     "import { FlutterPage } from '@ohos/flutter_ohos';\n@Entry\n@Component\nstruct Index { build() { Column() { FlutterPage({ viewId: this.viewId, }) } } onBackPress(): boolean { return true; } }\n",
   );
 }
+
+const xcodeFixture = '''// !\$*UTF8*\$!
+{
+  archiveVersion = 1;
+  objectVersion = 54;
+  objects = {
+    A00000000000000000000001 = {
+      isa = PBXProject;
+      mainGroup = A00000000000000000000002;
+      targets = (A00000000000000000000003,);
+    };
+    A00000000000000000000002 = {
+      isa = PBXGroup;
+      children = (A00000000000000000000005,);
+      sourceTree = "<group>";
+    };
+    A00000000000000000000003 = {
+      isa = PBXNativeTarget;
+      name = Runner;
+      productType = "com.apple.product-type.application";
+      buildPhases = (A00000000000000000000004, A0000000000000000000000A,);
+    };
+    A00000000000000000000004 = {
+      isa = PBXResourcesBuildPhase;
+      buildActionMask = 2147483647;
+      files = (A00000000000000000000008,);
+      runOnlyForDeploymentPostprocessing = 0;
+    };
+    A00000000000000000000005 = {
+      isa = PBXGroup;
+      children = (A00000000000000000000006,);
+      path = Runner;
+      sourceTree = "<group>";
+    };
+    A00000000000000000000006 = {
+      isa = PBXVariantGroup;
+      name = LaunchScreen.storyboard;
+      children = (A00000000000000000000007,);
+      sourceTree = "<group>";
+    };
+    A00000000000000000000007 = {
+      isa = PBXFileReference;
+      name = Base;
+      path = Base.lproj/LaunchScreen.storyboard;
+      sourceTree = "<group>";
+    };
+    A00000000000000000000008 = {
+      isa = PBXBuildFile;
+      fileRef = A00000000000000000000006;
+    };
+    // Preserve unrelated build settings and quoted script punctuation.
+    A0000000000000000000000A = {
+      isa = PBXShellScriptBuildPhase;
+      shellScript = "echo 'tokens: { }; ( ); /* keep */';";
+    };
+  };
+  rootObject = A00000000000000000000001;
+}
+''';
 
 void saveSnapshot(Directory root, DesignSnapshot snapshot) {
   for (final entry in snapshot.files().entries) {

@@ -9,6 +9,7 @@ class OutputPlan {
   final Map<String, List<int>> writes = {};
   final Set<String> owned = {};
   final Set<String> deletes = {};
+  final List<String> integrationIssues = [];
   OutputPlan(this.project);
   String absolute(String relative) {
     final path = p.join(project.absolute.path, safeRelative(relative));
@@ -82,6 +83,7 @@ class OutputPlan {
       writes[entry.key] = entry.value;
     }
     deletes.addAll(plan.deletes);
+    integrationIssues.addAll(plan.integrationIssues);
   }
 
   List<String> get changes => [

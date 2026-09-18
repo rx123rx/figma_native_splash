@@ -8,6 +8,7 @@ The generator is tested as a command-line development tool. A successful generat
 - The complete README configuration block matches the standalone YAML example and includes every supported field.
 - Mocked Figma API requests pin a design version; asset downloads do not receive the API token. Authentication and rate-limit failures are reported without printing secrets.
 - Transformed layers use absolute bounds and preserve exported PNG bytes; background coverage and exported aspect mismatches still fail (mocked Figma responses).
+- Xcode OpenStep parsing and targeted edits; new/existing/localized storyboard references, missing Resources phases, multiple targets, repeat generation, and CLI check/dry-run/create behavior.
 - Snapshot integrity, output conflicts, edited-file protection, project boundary checks, and repeat generation with no changes.
 - OHOS app splash opt-in/opt-out, generated-resource cleanup, and preservation of custom host code.
 - Shared layout bounds for phone, landscape, tablet and small windows; Android 12 icon safe-circle containment; preview background coverage.
@@ -19,7 +20,7 @@ The generator is tested as a command-line development tool. A successful generat
 - OHOS resource/ArkTS compilation and unsigned HAP packaging.
 - OHOS phone emulator: portrait and landscape layered view; an isolated Flutter application reached the first frame with the optional app splash enabled and disabled.
 
-These checks covered the generator before its public naming cleanup; the public package is additionally checked with Dart analysis, automated tests and `dart pub publish --dry-run`.
+The initial native checks covered the generator before its public naming cleanup. The Xcode registration fix was additionally validated in an isolated iOS application: the CLI registered a previously unreferenced storyboard, Xcode built the simulator application successfully, and the resulting App contained both the compiled launch storyboard and Assets.car. Repeated generation reported no changes. This is a packaging check, not a cold-launch visual test of the consuming application. The public package is also checked with Dart analysis, automated tests and `dart pub publish --dry-run`.
 
 ## Remaining limits
 
@@ -31,8 +32,9 @@ These checks covered the generator before its public naming cleanup; the public 
 
 ```bash
 dart run tool/create_validation_project.dart /tmp/figma-splash-validation
-dart run bin/check.dart --project=/tmp/figma-splash-validation
 dart run bin/create.dart --project=/tmp/figma-splash-validation --dry-run
+dart run bin/create.dart --project=/tmp/figma-splash-validation
+dart run bin/check.dart --project=/tmp/figma-splash-validation
 dart run bin/preview.dart --project=/tmp/figma-splash-validation
 ```
 

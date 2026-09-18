@@ -93,6 +93,9 @@ project:
 
   # 选填，默认 ios/Runner。
   # iOS Runner 目录；必须有 Info.plist，工具会写入其 Assets.xcassets / Base.lproj。
+  # 同级目录必须存在唯一 .xcodeproj；工具会自动修改其中的 project.pbxproj。
+  # 多应用 Target 时优先选择与该目录同名的应用 Target，否则必须只有一个应用 Target。
+  # 缺少工程或 Target 无法唯一定位：报错，不只写图片后假定接入成功。
   # 省略：使用标准 Runner。不是 .xcodeproj 路径，也不是整个 ios 根目录。
   ios_runner: ios/Runner
 

@@ -6,6 +6,7 @@ import 'snapshot.dart';
 import 'output.dart';
 import 'ios_template.dart';
 import 'artwork.dart';
+import 'xcode_project.dart';
 
 void generateIos(
   OutputPlan plan,
@@ -139,6 +140,7 @@ void generateIos(
     background.setAttribute(entry.key, (entry.value / 255).toStringAsFixed(6));
   }
   final storyboard = '${prefix}_LaunchScreen';
+  integrateIosStoryboard(plan, runner, storyboard);
   plan.text(
     '$runner/Base.lproj/$storyboard.storyboard',
     '${document.toXmlString(pretty: true)}\n',
@@ -151,6 +153,9 @@ void generateIos(
     (e) => e.name.local == 'key' && e.innerText == 'UILaunchStoryboardName',
   );
   if (keyIndex < 0) {
+    plan.integrationIssues.add(
+      'Info.plist 缺少 UILaunchStoryboardName，请执行 create 修复',
+    );
     dict.children.addAll([
       XmlElement(XmlName('key'), [], [XmlText('UILaunchStoryboardName')]),
       XmlElement(XmlName('string'), [], [XmlText(storyboard)]),
@@ -159,6 +164,9 @@ void generateIos(
     if (keyIndex + 1 >= elements.length ||
         elements[keyIndex + 1].name.local != 'string') {
       throw SplashException('Info.plist 的 UILaunchStoryboardName 格式无效');
+    }
+    if (elements[keyIndex + 1].innerText != storyboard) {
+      plan.integrationIssues.add('Info.plist 尚未指向生成的启动图，请执行 create 修复');
     }
     elements[keyIndex + 1].children
       ..clear()

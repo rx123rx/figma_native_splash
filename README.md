@@ -54,14 +54,14 @@ platforms: [android, ios]
 # 1. 联网读取设计，保存快照、素材和构图预览；不修改原生工程。
 dart run figma_native_splash:sync
 
-# 2. 离线检查配置、快照哈希、工程接入条件和文件冲突；不写文件。
-dart run figma_native_splash:check
-
-# 3. 查看预计修改/删除的原生文件；不写文件。
+# 2. 查看预计修改/删除的原生文件及 Xcode 接入；不写文件。
 dart run figma_native_splash:create --dry-run
 
-# 4. 应用生成结果。
+# 3. 应用生成结果，自动注册 iOS Storyboard 到 Resources。
 dart run figma_native_splash:create
+
+# 4. 检查实际接入与输出冲突；不写文件。
+dart run figma_native_splash:check
 ```
 
 首次 `sync` 之前执行 `check/create/preview` 会提示缺少快照，**不会自行联网下载**。修改设计后再次主动执行 `sync`，再生成、检查 diff 并运行 App 验收。
@@ -167,6 +167,9 @@ project:
 
   # 选填，默认 ios/Runner。
   # iOS Runner 目录；必须有 Info.plist，工具会写入其 Assets.xcassets / Base.lproj。
+  # 同级目录必须存在唯一 .xcodeproj；工具会自动修改其中的 project.pbxproj。
+  # 多应用 Target 时优先选择与该目录同名的应用 Target，否则必须只有一个应用 Target。
+  # 缺少工程或 Target 无法唯一定位：报错，不只写图片后假定接入成功。
   # 省略：使用标准 Runner。不是 .xcodeproj 路径，也不是整个 ios 根目录。
   ios_runner: ios/Runner
 
@@ -254,7 +257,7 @@ Launch screen (Frame / Component / Instance)
 | `create` | 否 | 原生工程与生成清单 | 按配置生成已启用平台；不签名、安装或发布 App |
 | `preview` | 否 | 预览图 | 从已保存的快照重新生成构图示意 |
 
-`check` 通过只表示生成条件满足，不代表已编译或运行通过。`check` 发现待更新文件仍可返回成功；真正缺少依赖文件、快照损坏或冲突时才返回非零退出码。
+`check` 通过只表示生成条件满足，不代表已编译或运行通过。`check` 发现普通素材待更新仍可返回成功；iOS Storyboard 未注册到应用 Resources，或 Info.plist 未指向生成的启动图时返回非零退出码，并提示执行 `create`。首次接入请按 `create --dry-run` → `create` → `check` 执行。缺少工程文件、快照损坏或冲突也会失败。
 
 ### 命令行参数
 
@@ -269,9 +272,9 @@ Launch screen (Frame / Component / Instance)
 `sync/preview` 不接受 `--platform`，它们针对完整设计快照。工具不支持 `--all`、平台列表参数或 `--remove`。预期配置/网络/文件错误通常以退出码 `2` 结束；退出码 `0` 表示该命令完成。
 
 ```bash
-# 仅检查并生成 iOS
-dart run figma_native_splash:check --platform=ios
+# 仅生成并检查 iOS
 dart run figma_native_splash:create --platform=ios
+dart run figma_native_splash:check --platform=ios
 
 # 配置文件放在项目内 config/ 目录；路径仍以项目根目录为基准
 dart run figma_native_splash:create --config=config/splash.yaml --dry-run
@@ -298,10 +301,14 @@ HTTP 429 表示限流，错误中会显示服务端提供的 `Retry-After` 信�
 
 | 平台 | 原生结果与适配方式 |
 |---|---|
-| iOS | 独立命名的 Storyboard 和图片集，更新 Info.plist 的 `UILaunchStoryboardName`；前景使用 Auto Layout、比例和安全区约束 |
+| iOS | 独立命名的 Storyboard 和图片集，更新 Info.plist 的 `UILaunchStoryboardName`，自动注册 Xcode 文件引用和应用 Resources；前景使用 Auto Layout、比例和安全区约束 |
 | Android API 24–30 | 分层 drawable，通过窗口宽高资源限定符选择尺寸；API 26+ 使用百分比垂直位置，24/25 使用 dp 回退 |
 | Android API 31+ | 系统纯色背景、居中图形和底部品牌；自动生成 1152×1152 安全图标画布与 800×320 品牌图，实际位置和大小由系统控制 |
 | 鸿蒙 | 默认只更新指定 Ability 的系统启动图标和底色；`app_splash: true` 时额外接入按可用窗口尺寸调整的 ArkUI 分层图 |
+
+iOS 自动接入支持传统 `PBXGroup` / `PBXVariantGroup` 工程：保留旧启动图及其他 Target，只新增生成资源的引用；已有正确引用直接复用，缺少 Resources 阶段时补建。`project.pbxproj` 作为共享工程配置增量修改，不纳入整文件内容锁定，后续签名和构建设置仍可正常编辑。
+
+当前不支持使用 `fileSystemSynchronizedGroups` 的自动同步源码 Target，遇到它会明确报错，需要在 Xcode 中先转换为普通 Group。多个 `.xcodeproj`、无法唯一确定的应用 Target、重复打包引用或受限的 Resources 阶段也会报错；不会猜测修改哪个工程。已有文件引用但未加入应用 Resources 的情况可以自动修复。
 
 当前模板的边界：
 

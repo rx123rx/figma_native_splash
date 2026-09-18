@@ -1,5 +1,7 @@
 ## 0.1.0
 
+- Fix missing iOS Xcode Resources registration; create now patches project.pbxproj idempotently and check reports incomplete storyboard integration.
+
 - Generate native Android, iOS and HarmonyOS splash resources from Figma design links.
 - Accept rotated and mirrored layers using transformed bounds and exported PNGs, retaining coverage and aspect checks.
 - Support named design layers and explicit node mappings for phone and tablet frames.
