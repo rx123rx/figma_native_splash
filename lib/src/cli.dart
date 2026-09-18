@@ -63,7 +63,7 @@ Future<void> runCli(List<String> arguments, {String? command}) async {
       try {
         final snapshot = await FigmaClient(
           client,
-          Platform.environment['FIGMA_ACCESS_TOKEN'] ?? '',
+          resolveFigmaAccessToken(config.accessToken),
         ).fetch(config);
         final plan = OutputPlan(project);
         for (final entry in snapshot.files().entries) {

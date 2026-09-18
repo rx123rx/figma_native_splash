@@ -7,6 +7,7 @@ import 'config.dart';
 class IconConfig {
   final Map<String, String> paths;
   final String ability;
+  final String? accessToken;
   final FrameConfig frame;
   final List<String> platforms;
   final String prefix;
@@ -24,6 +25,7 @@ class IconConfig {
     this.monochrome,
     this.androidManifest,
     this.ohosAppScope,
+    this.accessToken,
   );
 
   factory IconConfig.load(File file) {
@@ -31,7 +33,8 @@ class IconConfig {
     return IconConfig.parse(file.readAsStringSync());
   }
   factory IconConfig.parse(String text) {
-    final map = configSection(text, 'icon');
+    final document = configSection(text, 'icon');
+    final map = document.values;
     allowedKeys(map, {
       'figma',
       'platforms',
@@ -132,6 +135,7 @@ class IconConfig {
           fallback: 'ohos/AppScope',
         ),
       ),
+      document.accessToken,
     );
   }
   List<String> get roles => [

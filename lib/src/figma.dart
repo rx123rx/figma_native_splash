@@ -19,7 +19,8 @@ class FigmaClient {
         .timeout(const Duration(seconds: 60));
     if (response.statusCode != 200) {
       final hint = switch (response.statusCode) {
-        401 || 403 => '检查 FIGMA_ACCESS_TOKEN、file_content:read 权限和文件访问权限',
+        401 || 403 =>
+          '检查 FIGMA_ACCESS_TOKEN 或 figma_access_token、file_content:read 权限和文件访问权限',
         429 =>
           'Figma 请求限流，请稍后重试（Retry-After: ${response.headers['retry-after'] ?? '未提供'}）',
         404 => '文件、节点或设计版本不存在',
@@ -33,7 +34,7 @@ class FigmaClient {
   Future<DesignSnapshot> fetch(SplashConfig config) async {
     if (token.trim().isEmpty) {
       throw SplashException(
-        '请通过 FIGMA_ACCESS_TOKEN 环境变量提供 Figma Personal Access Token',
+        '请通过 FIGMA_ACCESS_TOKEN 环境变量或顶层 figma_access_token 配置提供 Figma Personal Access Token',
       );
     }
     final versions = <String, String>{};

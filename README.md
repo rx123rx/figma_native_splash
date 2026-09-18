@@ -4,6 +4,8 @@ Generate native splash screens and app icons for Android, iOS, and HarmonyOS fro
 
 从 **Figma 设计链接**生成 Android、iOS、鸿蒙原生启动图和桌面 App 图标的 Dart 命令行工具。支持「背景＋主视觉＋底部品牌」分层模板、手机/平板适配、设计快照、构图预览和生成文件冲突检查。工具不参与 App 运行，不需要 AI，也不依赖 Python 或其他启动图插件。
 
+> **同步凭据：** 可在配置文件最前面的 `figma_access_token` 填写 Figma Personal Access Token，也可设置环境变量 `FIGMA_ACCESS_TOKEN`（非空时优先）。仅 `sync` 和 `icon sync` 需要凭据；两处都未提供时会在联网前报错。Token 需要 `file_content:read` 权限，且所属账号有权访问目标文件。填写真实 Token 的配置不要提交到 Git 或分享；团队共享配置建议留空，通过环境变量提供凭据。离线 `create` / `check` / `preview` 无需 Token。
+
 > 当前是首次公开发布准备版本。只有发布成功后才能从 pub.dev 下载；发布前可使用本地 path 依赖。本文中的 `ExampleFileKey`、节点 ID 为演示占位值，请替换成有访问权限的真实 Figma 画板。
 
 ## 1. 安装与使用条件
@@ -35,6 +37,7 @@ dev_dependencies:
 配置按功能分成顶层 **`icon`**（桌面图标）和 **`splash`**（启动图）两段。每段自己的 `figma`、`platforms`、`resource_prefix`、`background_color` 和 `project` 独立生效，互不继承。只用其中一种功能时，可以省略另一段。两种功能一起使用时，可直接复制[完整配置示例](#complete-config)，`schema_version` 只写一次。
 
 ```yaml
+figma_access_token: "" # 选填；可在本地填写，非空环境变量优先
 schema_version: 1
 icon:
   figma: https://www.figma.com/design/ExampleFileKey/AppIcon?node-id=2-1
@@ -68,7 +71,7 @@ splash:
   platforms: [android, ios]
 ```
 
-在终端或 CI 密钥管理中设置 `FIGMA_ACCESS_TOKEN`，不要写入 YAML 或 Git。这个环境变量只在 `sync` 时需要；登录 Figma 网页或编辑器并不会自动为命令行提供 Token。
+在 YAML 最前面的 `figma_access_token` 填写 Token，或在终端 / CI 密钥管理中设置 `FIGMA_ACCESS_TOKEN`。非空环境变量优先；空白值视为未提供。不要将真实凭据提交到 Git。登录 Figma 网页或编辑器不会自动为命令行提供 Token。
 
 ```bash
 # 1. 联网读取设计，保存快照、素材和构图预览；不修改原生工程。
@@ -96,6 +99,13 @@ dart run figma_native_splash:check
 
 <!-- BEGIN COMPLETE CONFIG -->
 ```yaml
+# 选填，供 icon sync 和 sync 共用的 Figma Personal Access Token。
+# 非空环境变量 FIGMA_ACCESS_TOKEN 优先；未设置或为空时使用本项。
+# 省略或 ""：仅使用环境变量；两处都没有 Token 时，同步会在联网前报错。
+# create/check/preview 不需要 Token。必须为字符串，不接受 null、数字或布尔值。
+# 填写真实 Token 后不要提交此文件到 Git；共享配置保留空字符串。
+figma_access_token: ""
+
 # 选填，配置格式版本（不是 App 或插件版本），默认 1。
 # 当前只接受整数 1；省略时按当前格式解析，其他值或 null 报错。
 schema_version: 1
@@ -293,6 +303,7 @@ splash:
 
 | 配置项 | 类型 | 是否必填 | 省略时的行为 |
 |---|---|---|---|
+| `figma_access_token` | 字符串 | 否 | 使用环境变量；两处均为空时仅同步命令报错，离线命令可用 |
 | `schema_version` | 整数 | 否 | 使用 `1`，只支持此版本 |
 | `splash` | 映射 | **启动图命令必填** | 报错；仅图标命令可省略 |
 | `splash.figma` | 映射 | **是** | 报错 |
@@ -319,7 +330,7 @@ splash:
 
 **配置项选填不代表对应设计图层可以缺失。** `background`、`foreground`、`branding` 三个角色都必须在设计稿中存在，即使只生成鸿蒙系统启动窗口。`nodes` 只是改变角色的查找方式。
 
-根节点仅接受 `schema_version`、`icon`、`splash`，出现的功能段必须是映射。各命令校验自身配置范围内的未知字段、错误类型和显式 `null`。启动图命令不处理 `icon` 配置，图标命令不要求 `splash.figma.phone`。需要默认值时请删除该字段，不要写空值、`"false"` 或 `null`。`nodes: {}`、`ohos: {}`、`project: {}` 合法，分别表示使用默认查找和默认设置；`platforms: []` 不合法。
+根节点仅接受 `figma_access_token`、`schema_version`、`icon`、`splash`，出现的功能段必须是映射。各命令校验自身配置范围内的未知字段、错误类型和显式 `null`。启动图命令不处理 `icon` 配置，图标命令不要求 `splash.figma.phone`。需要默认值时请删除该字段，不要写空值、`"false"` 或 `null`。`nodes: {}`、`ohos: {}`、`project: {}` 合法，分别表示使用默认查找和默认设置；`platforms: []` 不合法。
 
 ## 4. Figma 设计稿要求
 
@@ -389,9 +400,19 @@ figma_native_splash sync --project=/path/to/app
 figma_native_splash create --project=/path/to/app
 ```
 
-### `FIGMA_ACCESS_TOKEN`
+### Token 配置与环境变量
 
-这是**唯一读取的凭据环境变量**，仅 `sync` 必需。省略或为空会在请求前报错；过期、缺少权限或无法访问文件通常导致 HTTP 401/403。工具不会交互登录、读取浏览器会话，也不会从配置文件查找 Token。下载导出图片时不会携带 Figma Token。
+`sync` 和 `icon sync` 共用一份 Token，按以下顺序选择：
+
+1. 非空的 `FIGMA_ACCESS_TOKEN` 环境变量。
+2. 顶层 `figma_access_token` 配置值。
+3. 两处都未提供：在联网前报错，不写快照。
+
+会去除首尾空白。配置字段可以省略或写 `""`，但不能写 `null`、数字、布尔值；环境变量优先不代表忽略配置类型错误。`create`、`check`、`preview` 不要求有效 Token，也不会联网验证它。认证失败不会自动改用另一份 Token。
+
+过期、缺少权限或无法访问文件通常导致 HTTP 401/403。工具不会交互登录或读取浏览器会话，下载导出图片时不会携带 Figma Token。Token 不写入生成资源、快照或预览，也不参与来源哈希；更换 Token 无需重新生成现有资源。
+
+如果希望共享主配置，可保持其中的 `figma_access_token: ""` 并使用环境变量；也可复制为已加入 `.gitignore` 的本地配置，通过 `--config=figma_splash.local.yaml` 指定，后续生成命令使用同一配置。
 
 HTTP 429 表示限流，错误中会显示服务端提供的 `Retry-After` 信息；工具不会在后台无限重试。同步失败时不会用部分下载结果替换现有快照。
 
@@ -508,7 +529,7 @@ icon:
 ### 命令与文件
 
 ```bash
-# 同步图标，不修改原生工程；需要 FIGMA_ACCESS_TOKEN。
+# 同步图标，不修改原生工程；Token 可来自环境变量或配置文件。
 fvm dart run figma_native_splash:icon sync
 
 # 离线查看资源和原生接入变化。
@@ -534,7 +555,7 @@ fvm dart run figma_native_splash:icon create --platform=ios
 | `--platform` | 选填，无 | 仅适用于 create/check；省略处理全部 icon.platforms，一次只能选一个已启用的平台 |
 | `--dry-run` | 选填，关闭 | sync/create/preview 计算结果但不写入；sync 仍联网并要求 Token；check 本身只读 |
 | `--help` / `-h` | 选填 | 不读配置、不联网，显示帮助 |
-| `FIGMA_ACCESS_TOKEN` | sync 必需 | 与启动图相同的凭据规则，只发给 Figma API，不发给图片下载地址 |
+| `FIGMA_ACCESS_TOKEN` | 选填；sync 需要至少一种凭据来源 | 非空时覆盖配置的 figma_access_token；只发给 Figma API，不发给图片下载地址 |
 
 图标 `check` 比启动图的预生成检查更严格：图标素材、清单或原生接入有任何待更新项都返回退出码 `2`，提示先执行 `icon create`；同步且无冲突返回 `0`。错误不自动修复，不会写入工程。
 

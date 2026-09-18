@@ -10,8 +10,14 @@ void main() {
         .split('<!-- BEGIN COMPLETE CONFIG -->\n```yaml\n')[1]
         .split('\n```\n<!-- END COMPLETE CONFIG -->')[0];
     final document = loadYaml(sample) as YamlMap;
-    expect(document.keys, ['schema_version', 'icon', 'splash']);
+    expect(document.keys, [
+      'figma_access_token',
+      'schema_version',
+      'icon',
+      'splash',
+    ]);
     final section = {
+      'figma_access_token': document['figma_access_token'],
       'schema_version': document['schema_version'],
       'icon': document['icon'],
     };
@@ -37,6 +43,7 @@ void main() {
     expect(
       keys,
       unorderedEquals([
+        'figma_access_token',
         'schema_version',
         'icon.figma',
         'icon.figma.url',

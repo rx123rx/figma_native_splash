@@ -1,3 +1,10 @@
+# 选填，供 icon sync 和 sync 共用的 Figma Personal Access Token。
+# 非空环境变量 FIGMA_ACCESS_TOKEN 优先；未设置或为空时使用本项。
+# 省略或 ""：仅使用环境变量；两处都没有 Token 时，同步会在联网前报错。
+# create/check/preview 不需要 Token。必须为字符串，不接受 null、数字或布尔值。
+# 填写真实 Token 后不要提交此文件到 Git；共享配置保留空字符串。
+figma_access_token: ""
+
 # 选填，整数，默认 1。目前只接受 1。
 # 省略：按当前配置格式解析。填写其他数字、字符串或 null：报错。
 schema_version: 1

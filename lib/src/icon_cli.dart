@@ -65,7 +65,7 @@ Future<void> runIconCli(List<String> arguments) async {
       final client = http.Client();
       try {
         final snapshot = await fetchIcon(
-          FigmaClient(client, Platform.environment['FIGMA_ACCESS_TOKEN'] ?? ''),
+          FigmaClient(client, resolveFigmaAccessToken(config.accessToken)),
           config,
         );
         final plan = OutputPlan(root);

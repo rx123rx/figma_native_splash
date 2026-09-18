@@ -1,5 +1,6 @@
 ## 0.1.0
 
+- 支持顶层 figma_access_token 配置；非空环境变量优先，图标与启动图共用，凭据不写入生成结果。
 - 配置按顶层 icon / splash 分别管理 Figma 来源、平台、颜色与工程路径，配置格式版本为 1。
 
 - Add independent Figma app icon sync/create/check/preview commands, Android adaptive and monochrome resources, iPhone/iPad AppIcon catalogs and HarmonyOS icon integration.

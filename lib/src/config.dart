@@ -43,9 +43,29 @@ Map<String, dynamic> configMap(Map<String, dynamic> map, String key) =>
 
 /// Read the configuration document envelope. Each command parses only its own section;
 /// there are no inherited platform, color, path or source settings.
-Map<String, dynamic> configSection(String text, String section) {
-  final root = asMap(loadYaml(text), '配置');
-  allowedKeys(root, {'schema_version', 'icon', 'splash'}, '配置根节点');
+({Map<String, dynamic> values, String? accessToken}) configSection(
+  String text,
+  String section,
+) {
+  dynamic yaml;
+  try {
+    yaml = loadYaml(text);
+  } on YamlException {
+    // YAML diagnostics include source lines, which may contain credentials.
+    throw SplashException('YAML 格式错误，请检查配置文件缩进、引号及重复字段');
+  }
+  final root = asMap(yaml, '配置');
+  allowedKeys(root, {
+    'figma_access_token',
+    'schema_version',
+    'icon',
+    'splash',
+  }, '配置根节点');
+  final rawToken = root['figma_access_token'];
+  if (root.containsKey('figma_access_token') && rawToken is! String) {
+    throw SplashException('figma_access_token 必须为字符串；留空请使用双引号空字符串或删除该字段');
+  }
+  final accessToken = (rawToken as String?)?.trim();
   if (root.containsKey('schema_version') &&
       (root['schema_version'] is! int || root['schema_version'] != 1)) {
     throw SplashException('schema_version 仅支持整数 1，省略时默认 1');
@@ -66,7 +86,25 @@ Map<String, dynamic> configSection(String text, String section) {
       );
     }
   }
-  return asMap(root[section], section);
+  return (values: asMap(root[section], section), accessToken: accessToken);
+}
+
+/// Credentials are resolved only for sync and are never part of source hashes.
+String resolveFigmaAccessToken(
+  String? configured, {
+  Map<String, String>? environment,
+}) {
+  final fromEnvironment =
+      (environment ?? Platform.environment)['FIGMA_ACCESS_TOKEN']?.trim();
+  final token = fromEnvironment != null && fromEnvironment.isNotEmpty
+      ? fromEnvironment
+      : configured?.trim();
+  if (token == null || token.isEmpty) {
+    throw SplashException(
+      '同步设计需要 Token：请设置 FIGMA_ACCESS_TOKEN 环境变量或配置顶层 figma_access_token',
+    );
+  }
+  return token;
 }
 
 List<String> configPlatforms(Map<String, dynamic> map, String section) {
@@ -164,6 +202,7 @@ class SplashConfig {
   final Map<String, String> paths;
   final String ability;
   final bool ohosAppSplash;
+  final String? accessToken;
   SplashConfig(
     this.frames,
     this.platforms,
@@ -172,13 +211,15 @@ class SplashConfig {
     this.paths,
     this.ability, {
     this.ohosAppSplash = false,
+    this.accessToken,
   });
   factory SplashConfig.load(File file) {
     if (!file.existsSync()) throw SplashException('未找到配置：${file.path}');
     return SplashConfig.parse(file.readAsStringSync());
   }
   factory SplashConfig.parse(String text) {
-    final map = configSection(text, 'splash');
+    final document = configSection(text, 'splash');
+    final map = document.values;
     allowedKeys(map, {
       'figma',
       'platforms',
@@ -261,6 +302,7 @@ class SplashConfig {
         fallback: 'EntryAbility',
       ),
       ohosAppSplash: appSplash,
+      accessToken: document.accessToken,
     );
   }
   String get sourceHash => sha256

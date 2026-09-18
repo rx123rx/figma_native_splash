@@ -75,7 +75,9 @@ class IconSnapshot {
 /// Sync a standalone icon frame and optional full-canvas adaptive layers.
 Future<IconSnapshot> fetchIcon(FigmaClient api, IconConfig config) async {
   if (api.token.trim().isEmpty) {
-    throw SplashException('icon sync 需要 FIGMA_ACCESS_TOKEN');
+    throw SplashException(
+      'icon sync 需要 FIGMA_ACCESS_TOKEN 环境变量或顶层 figma_access_token 配置',
+    );
   }
   final link = config.frame.link;
   final data = await api.requestJson('files/${link.fileKey}/nodes', {
