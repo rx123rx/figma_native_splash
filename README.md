@@ -1,23 +1,21 @@
 # figma_native_splash
 
-Generate native splash screens and app icons for Android, iOS, and HarmonyOS from Figma designs, with versioned snapshots and offline generation.
-
-从 **Figma 设计链接**生成 Android、iOS、鸿蒙原生启动图和桌面 App 图标的 Dart 命令行工具。支持「背景＋主视觉＋底部品牌」分层模板、手机/平板适配、设计快照、构图预览和生成文件冲突检查。工具不参与 App 运行，不需要 AI，也不依赖 Python 或其他启动图插件。
+从 **Figma 设计链接**生成 Android、iOS、鸿蒙原生启动图和桌面 App 图标。支持手机/平板适配、构图预览和离线生成。
 
 > **同步凭据：** 可在配置文件最前面的 `figma_access_token` 填写 Figma Personal Access Token，也可设置环境变量 `FIGMA_ACCESS_TOKEN`（非空时优先）。仅 `sync` 和 `icon sync` 需要凭据；两处都未提供时会在联网前报错。Token 需要 `file_content:read` 权限，且所属账号有权访问目标文件。填写真实 Token 的配置不要提交到 Git 或分享；团队共享配置建议留空，通过环境变量提供凭据。离线 `create` / `check` / `preview` 无需 Token。
 
-> 当前是首次公开发布准备版本。只有发布成功后才能从 pub.dev 下载；发布前可使用本地 path 依赖。本文中的 `ExampleFileKey`、节点 ID 为演示占位值，请替换成有访问权限的真实 Figma 画板。
+> 示例中的 `ExampleFileKey`、节点 ID 为占位值，请替换成有访问权限的真实 Figma 画板。
 
 ## 1. 安装与使用条件
 
-pub.dev 发布后的依赖声明：
+在 Flutter 项目的 `pubspec.yaml` 中添加依赖：
 
 ```yaml
 dev_dependencies:
   figma_native_splash: ^0.1.0
 ```
 
-发布前，在 App 与本工具目录相邻时可以使用：
+使用本地源码时，在 App 与本工具目录相邻的情况下可以配置：
 
 ```yaml
 dev_dependencies:
@@ -378,7 +376,7 @@ Launch screen (Frame / Component / Instance)
 | `--dry-run` | `sync`、`create`、`preview` | 选填，默认关闭 | 计算并打印变化但不写文件；`sync` 仍访问网络、需要 Token；对只读的 `check` 没有额外效果 |
 | `--help` / `-h` | 全部 | 选填 | 显示帮助，不读取项目配置或访问网络 |
 
-`sync/preview` 不接受 `--platform`，它们针对完整设计快照。工具不支持 `--all`、平台列表参数或 `--remove`。独立的 App 图标命令见第 10 节。预期配置/网络/文件错误通常以退出码 `2` 结束；退出码 `0` 表示该命令完成。
+`sync/preview` 不接受 `--platform`，它们针对完整设计快照。工具不支持 `--all`、平台列表参数或 `--remove`。独立的 App 图标命令见第 9 节。预期配置/网络/文件错误通常以退出码 `2` 结束；退出码 `0` 表示该命令完成。
 
 ```bash
 # 仅生成并检查 iOS
@@ -388,11 +386,11 @@ dart run figma_native_splash:check --platform=ios
 # 配置文件放在项目内 config/ 目录；路径仍以项目根目录为基准
 dart run figma_native_splash:create --config=config/splash.yaml --dry-run
 
-# 在工具源码目录操作另一个 App
-dart run bin/figma_native_splash.dart create --project=/path/to/app
+# 指定目标 App 的路径
+dart run figma_native_splash:create --project=/path/to/app
 ```
 
-发布后也可全局激活：
+也可全局安装后使用：
 
 ```bash
 dart pub global activate figma_native_splash
@@ -420,19 +418,16 @@ HTTP 429 表示限流，错误中会显示服务端提供的 `Retry-After` 信�
 
 | 平台 | 原生结果与适配方式 |
 |---|---|
-| iOS | 独立命名的 Storyboard 和图片集，更新 Info.plist 的 `UILaunchStoryboardName`，自动注册 Xcode 文件引用和应用 Resources；前景使用 Auto Layout、比例和安全区约束 |
-| Android API 24–30 | 分层 drawable，通过窗口宽高资源限定符选择尺寸；API 26+ 使用百分比垂直位置，24/25 使用 dp 回退 |
+| iOS | 根据手机/平板尺寸适配分层启动图，自动接入 Xcode 工程 |
+| Android API 24–30 | 分层启动图，按窗口尺寸适配背景、主视觉和底部品牌 |
 | Android API 31+ | 系统纯色背景、居中图形和底部品牌；自动生成 1152×1152 安全图标画布与 800×320 品牌图，实际位置和大小由系统控制 |
 | 鸿蒙 | 默认只更新指定 Ability 的系统启动图标和底色；`app_splash: true` 时额外接入按可用窗口尺寸调整的 ArkUI 分层图 |
 
-iOS 自动接入支持传统 `PBXGroup` / `PBXVariantGroup` 工程：保留旧启动图及其他 Target，只新增生成资源的引用；已有正确引用直接复用，缺少 Resources 阶段时补建。`project.pbxproj` 作为共享工程配置增量修改，不纳入整文件内容锁定，后续签名和构建设置仍可正常编辑。
-
-当前不支持使用 `fileSystemSynchronizedGroups` 的自动同步源码 Target，遇到它会明确报错，需要在 Xcode 中先转换为普通 Group。多个 `.xcodeproj`、无法唯一确定的应用 Target、重复打包引用或受限的 Resources 阶段也会报错；不会猜测修改哪个工程。已有文件引用但未加入应用 Resources 的情况可以自动修复。
+iOS 工程需能唯一确定 `.xcodeproj` 和应用 Target。使用 `fileSystemSynchronizedGroups` 的 Target 需先在 Xcode 中转换为普通 Group。
 
 当前模板的边界：
 
 - 只有手机和 Pad 两份设计入口，没有横屏独立稿、任意图层或交互动画配置。横屏使用相同构图并根据可用高度缩小前景。
-- iOS 按设备 idiom 选择图片，按窗口尺寸约束布局；Android/鸿蒙根据窗口宽度选择手机/宽屏素材。三端不是逐像素相同的布局引擎。
 - Android 旧版背景铺满窗口；iOS/鸿蒙分层背景等比覆盖裁剪。主视觉和品牌始终保持比例。
 - 深色和浅色使用同一套品牌素材，目前没有独立深色 Figma 链接或暗色覆盖字段。
 - Android 12+ 无法通过系统启动窗口实现完整渐变宣传海报。
@@ -461,7 +456,6 @@ figma_splash.yaml
 - 图片哈希不符时拒绝生成；不要手工替换快照里的 PNG。
 - 重复生成相同内容不产生额外文件差异。
 - 首次遇到同名但不同内容的资源、已生成资源被手动修改，都会报错，不静默覆盖。更改资源前缀/工程目录时应先明确迁移旧接入和资源，工具不是通用重命名器。
-- 先计算并检查全部选中平台，再写入；写入异常时尝试恢复原文件。它不提供进程崩溃或断电级事务保证。
 - 工程配置只更新所需启动字段。不会自动删除其他启动图插件、旧资源、签名设置或业务代码。
 
 ## 8. 常见错误
@@ -478,23 +472,7 @@ figma_splash.yaml
 | 关闭鸿蒙宣传图提示剩余引用 | 检查手动改动的导入、builder 引用，避免删除仍被使用的代码 |
 | 预览与设备不完全相同 | 预览是构图示意，不包含真实系统栏、启动动画和各系统约束 |
 
-## 9. 开发、验证与发布
-
-```bash
-dart pub get
-dart format --output=none --set-exit-if-changed lib bin test tool example
-dart analyze
-dart test
-dart pub publish --dry-run
-```
-
-完整配置样例在本文维护；[example/figma_icon.yaml](example/figma_icon.yaml) 和 [example/figma_splash.yaml](example/figma_splash.yaml) 分别提供单功能配置。测试会检查完整示例的两段与独立文件一致，并验证所有字段可以被解析。无需访问 Figma 的代码调用示例见 [example/example.dart](example/example.dart)。
-
-[验证范围](doc/validation.md) · [发布说明](doc/publishing.md) · [MIT License](LICENSE)
-
-本工具与 Figma、Flutter 或平台厂商没有官方隶属关系。
-
-## 10. 桌面 App 图标
+## 9. 桌面 App 图标
 
 图标功能与系统启动窗口的图标是两回事。**普通 `sync/create/check/preview` 命令仅处理启动图**；`icon sync/create/check/preview` 才处理桌面图标。只配置启动图的项目可省略整个 `icon` 段。图标命令不会改启动 Storyboard、Android LaunchTheme、鸿蒙 `startWindowIcon` 或 `startWindowBackground`。
 

@@ -19,5 +19,7 @@ executables:
 topics:
   - flutter
   - figma
+  - launch
+  - launch-icon
   - splash-screen
   - code-generation

@@ -8,15 +8,13 @@ This package is prepared for pub.dev, but creating the package files or running 
 4. Run the following checks from the package root:
 
    ```bash
-   dart pub get
-   dart format --output=none --set-exit-if-changed lib bin test tool example
-   dart analyze
-   dart test
-   dart pub publish --dry-run
+   ./tool/publish.sh
    ```
+
+   The script runs dependency resolution, format checks, static analysis, tests and `dart pub publish --dry-run`, stopping on the first failure. It resolves the package root from its own location, so it can also be invoked from another directory. `--dry-run` explicitly selects the default mode; add `--fvm` to use `fvm dart`. Run `./tool/publish.sh --help` for all options.
 
 5. Inspect the upload file list. `.pubignore` excludes local caches, credentials, logs and the dependency lockfile. Examples and tests must not contain private Figma file IDs, application artwork, machine paths or organization-specific namespaces.
 6. Validate the real Figma export with an authorized token and confirm the generated screens in native applications before claiming full production validation.
-7. When the release is approved, the maintainer can run `dart pub publish` and complete pub.dev authentication. Publishing is a separate manual action; this repository's preparation does not run it.
+7. When ready to release, run `./tool/publish.sh --publish` (or `./tool/publish.sh --publish --fvm`). This repeats all checks, then runs `dart pub publish` with the standard upload confirmation and pub.dev authentication. The script does not change the version, create a commit or tag, or bypass publishing warnings. Update `pubspec.yaml` and `CHANGELOG.md` before each release.
 
 Changes to the configuration example should be made in README and mirrored into `example/figma_splash.yaml`; a test enforces equality. The default OHOS app splash is disabled.
