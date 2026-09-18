@@ -7,7 +7,7 @@ class FigmaClient {
   final http.Client client;
   final String token;
   FigmaClient(this.client, this.token);
-  Future<Map<String, dynamic>> _api(
+  Future<Map<String, dynamic>> requestJson(
     String path,
     Map<String, String> query,
   ) async {
@@ -42,7 +42,7 @@ class FigmaClient {
     final sources = <String, dynamic>{};
     for (final entry in config.frames.entries) {
       final link = entry.value.link;
-      final response = await _api('files/${link.fileKey}/nodes', {
+      final response = await requestJson('files/${link.fileKey}/nodes', {
         'ids': link.nodeId,
         if (versions.containsKey(link.fileKey))
           'version': versions[link.fileKey]!,
@@ -114,7 +114,7 @@ class FigmaClient {
         link.nodeId,
         ...layers.values.map((layer) => layer.nodeId),
       ];
-      final exports = await _api('images/${link.fileKey}', {
+      final exports = await requestJson('images/${link.fileKey}', {
         'ids': exportIds.join(','),
         'format': 'png',
         'scale': '3',

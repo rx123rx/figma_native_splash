@@ -125,7 +125,22 @@ class _Parser {
 
 /// Register the generated storyboard in the selected app target's Resources.
 /// Ambiguous projects are rejected before any output is written.
-void integrateIosStoryboard(OutputPlan plan, String runner, String storyboard) {
+void integrateIosStoryboard(
+  OutputPlan plan,
+  String runner,
+  String storyboard,
+) => _integrateIosResource(plan, runner, storyboard, appIcon: false);
+
+/// Register the asset catalog and set the app icon name in every app build configuration.
+void integrateIosAppIcon(OutputPlan plan, String runner, String name) =>
+    _integrateIosResource(plan, runner, name, appIcon: true);
+
+void _integrateIosResource(
+  OutputPlan plan,
+  String runner,
+  String storyboard, {
+  required bool appIcon,
+}) {
   final parent = p.dirname(runner);
   final directory = Directory(plan.absolute(parent));
   if (!directory.existsSync()) throw SplashException('找不到 iOS 工程目录：$parent');
@@ -181,11 +196,13 @@ void integrateIosStoryboard(OutputPlan plan, String runner, String storyboard) {
   if (mainId == null) throw SplashException('Xcode 工程缺少 mainGroup');
   final main = object(mainId);
   final expected = p.normalize(
-    p.join(
-      p.relative(runner, from: parent),
-      'Base.lproj',
-      '$storyboard.storyboard',
-    ),
+    appIcon
+        ? p.join(p.relative(runner, from: parent), 'Assets.xcassets')
+        : p.join(
+            p.relative(runner, from: parent),
+            'Base.lproj',
+            '$storyboard.storyboard',
+          ),
   );
   final candidates = <String>{};
   final active = <String>{};
@@ -202,7 +219,8 @@ void integrateIosStoryboard(OutputPlan plan, String runner, String storyboard) {
       p.join(tree == 'SOURCE_ROOT' ? '.' : base, path),
     );
     if (type == 'PBXFileReference' && resolved == expected) {
-      if (variant != null &&
+      if (!appIcon &&
+          variant != null &&
           field(object(variant), 'name') != '$storyboard.storyboard') {
         throw SplashException(
           '启动图本地化组名称与生成的 Storyboard 不一致，请先修正 Xcode Group 名称',
@@ -218,7 +236,7 @@ void integrateIosStoryboard(OutputPlan plan, String runner, String storyboard) {
   }
 
   walk(mainId, '.', null);
-  if (candidates.length > 1) throw SplashException('Xcode 中存在多个指向生成启动图的文件引用');
+  if (candidates.length > 1) throw SplashException('Xcode 中存在多个指向目标资源的文件引用');
   final resourcePhases = ids(target, 'buildPhases')
       .where((id) => field(object(id), 'isa') == 'PBXResourcesBuildPhase')
       .toList();
@@ -271,7 +289,7 @@ void integrateIosStoryboard(OutputPlan plan, String runner, String storyboard) {
     ref = newId('file');
     // SOURCE_ROOT avoids depending on a particular user-visible Group layout.
     additions.writeln(
-      '\t\t$ref = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = ${jsonEncode(expected)}; sourceTree = SOURCE_ROOT; };',
+      '\t\t$ref = {isa = PBXFileReference; lastKnownFileType = ${appIcon ? 'folder.assetcatalog' : 'file.storyboard'}; path = ${jsonEncode(expected)}; sourceTree = SOURCE_ROOT; };',
     );
     append(main, 'children', ref);
   }
@@ -279,7 +297,7 @@ void integrateIosStoryboard(OutputPlan plan, String runner, String storyboard) {
   if (phase != null &&
       (field(phase, 'runOnlyForDeploymentPostprocessing') == '1' ||
           field(phase, 'buildActionMask') == '0')) {
-    throw SplashException('应用 Resources 阶段被限制为非普通构建，无法保证启动图打包');
+    throw SplashException('应用 Resources 阶段被限制为非普通构建，无法保证资源打包');
   }
   final matching = phase == null
       ? <String>[]
@@ -287,11 +305,11 @@ void integrateIosStoryboard(OutputPlan plan, String runner, String storyboard) {
           phase,
           'files',
         ).where((id) => field(object(id), 'fileRef') == ref).toList();
-  if (matching.length > 1) throw SplashException('生成启动图在应用 Resources 中被重复打包');
+  if (matching.length > 1) throw SplashException('目标资源在应用 Resources 中被重复打包');
   if (matching.isNotEmpty &&
       (object(matching.single).map.containsKey('platformFilters') ||
           object(matching.single).map.containsKey('platformFilter'))) {
-    throw SplashException('启动图 Resources 引用带 platformFilters，请移除平台限制后重试');
+    throw SplashException('目标资源 Resources 引用带 platformFilters，请移除平台限制后重试');
   }
   if (matching.isEmpty) {
     final build = newId('build');
@@ -304,6 +322,40 @@ void integrateIosStoryboard(OutputPlan plan, String runner, String storyboard) {
         '\t\t$phaseId = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ($build,); runOnlyForDeploymentPostprocessing = 0; };',
       );
       append(target, 'buildPhases', phaseId);
+    }
+  }
+  if (appIcon) {
+    final listId = field(target, 'buildConfigurationList');
+    if (listId == null) {
+      throw SplashException('应用 Target 缺少 buildConfigurationList');
+    }
+    final configs = ids(object(listId), 'buildConfigurations');
+    if (configs.isEmpty) throw SplashException('应用 Target 没有构建配置');
+    for (final id in configs) {
+      final config = object(id);
+      final settings = config.map['buildSettings'];
+      if (settings == null) throw SplashException('应用构建配置缺少 buildSettings');
+      const key = 'ASSETCATALOG_COMPILER_APPICON_NAME';
+      final keys = settings.map.keys
+          .where((k) => k == key || k.startsWith('$key['))
+          .toList();
+      if (!keys.contains(key)) {
+        edits.add((
+          start: settings.end - 1,
+          end: settings.end - 1,
+          text: '\n\t\t\t\t$key = ${jsonEncode(storyboard)};\n\t\t\t',
+        ));
+      }
+      for (final key in keys) {
+        final value = settings.map[key]!;
+        if (value.string != storyboard) {
+          edits.add((
+            start: value.start,
+            end: value.end,
+            text: jsonEncode(storyboard),
+          ));
+        }
+      }
     }
   }
   if (additions.isNotEmpty) {
@@ -321,6 +373,8 @@ void integrateIosStoryboard(OutputPlan plan, String runner, String storyboard) {
   }
   plan.text(projectPath, updated, own: false);
   plan.integrationIssues.add(
-    'iOS 启动图尚未注册到应用 Resources：$projectPath；请执行 create 修复',
+    appIcon
+        ? 'iOS AppIcon 资源接入或构建配置尚未完成：$projectPath；请执行 icon create 修复'
+        : 'iOS 启动图尚未注册到应用 Resources：$projectPath；请执行 create 修复',
   );
 }

@@ -1,8 +1,8 @@
 # figma_native_splash
 
-Generate native Android, iOS, and HarmonyOS splash screens from Figma designs, with versioned snapshots and offline generation.
+Generate native splash screens and app icons for Android, iOS, and HarmonyOS from Figma designs, with versioned snapshots and offline generation.
 
-从 **Figma 设计链接**生成 Android、iOS、鸿蒙原生启动图的 Dart 命令行工具。支持「背景＋主视觉＋底部品牌」分层模板、手机/平板适配、设计快照、构图预览和生成文件冲突检查。工具不参与 App 运行，不需要 AI，也不依赖 Python 或其他启动图插件。
+从 **Figma 设计链接**生成 Android、iOS、鸿蒙原生启动图和桌面 App 图标的 Dart 命令行工具。支持「背景＋主视觉＋底部品牌」分层模板、手机/平板适配、设计快照、构图预览和生成文件冲突检查。工具不参与 App 运行，不需要 AI，也不依赖 Python 或其他启动图插件。
 
 > 当前是首次公开发布准备版本。只有发布成功后才能从 pub.dev 下载；发布前可使用本地 path 依赖。本文中的 `ExampleFileKey`、节点 ID 为演示占位值，请替换成有访问权限的真实 Figma 画板。
 
@@ -68,7 +68,7 @@ dart run figma_native_splash:check
 
 ## 3. 完整配置示例：每个选项都有注释
 
-下面列出了所有受支持的 YAML 配置项。可以整段复制后替换链接和节点；不需要的选填项可删除。图层命名已符合约定时，建议删除 `nodes` 映射，避免复制演示 ID 后找不到图层。
+下面列出了启动图的全部 YAML 配置项；独立图标配置见第 10 节。可以整段复制后替换链接和节点；不需要的选填项可删除。图层命名已符合约定时，建议删除 `nodes` 映射，避免复制演示 ID 后找不到图层。
 
 <!-- BEGIN FULL CONFIG -->
 ```yaml
@@ -79,7 +79,7 @@ schema_version: 1
 # 必填，映射。整个 figma 省略、为 null 或类型错误：报错。
 # 这里只支持 Figma 来源，没有本地图片输入配置。
 figma:
-  # 必填。接受「URL 字符串」或下方这种「url + nodes 映射」。
+  # 生成启动图时必填；仅使用 icon 命令时不需要 phone。接受「URL 字符串」或下方这种「url + nodes 映射」。
   # 省略 phone：报错，不会拿 tablet 自动代替手机稿。
   phone:
     # 对象写法下必填，非空字符串。
@@ -198,7 +198,7 @@ project:
 |---|---|---|---|
 | `schema_version` | 整数 | 否 | 使用 `1`，只支持此版本 |
 | `figma` | 映射 | **是** | 报错 |
-| `figma.phone` | URL 字符串或映射 | **是** | 报错 |
+| `figma.phone` | URL 字符串或映射 | **启动图命令必填** | 报错；独立 icon 命令无需此项 |
 | `figma.phone.url` | 字符串 | **对象写法时是** | 报错；URL 简写不需要这个键 |
 | `figma.phone.nodes` | 映射 | 否 | 三个角色都按约定名字查找 |
 | `figma.phone.nodes.background` | 节点 ID 字符串 | 否 | 查找 `splash/background` |
@@ -221,7 +221,7 @@ project:
 
 **配置项选填不代表对应设计图层可以缺失。** `background`、`foreground`、`branding` 三个角色都必须在设计稿中存在，即使只生成鸿蒙系统启动窗口。`nodes` 只是改变角色的查找方式。
 
-未知字段、错误类型、显式 `null` 会报错。需要默认值时请删除该字段，不要写空值、`"false"` 或 `null`。`nodes: {}`、`ohos: {}`、`project: {}` 合法，分别表示使用默认查找和默认设置；`platforms: []` 不合法。
+各命令校验自身配置范围内的未知字段、错误类型和显式 `null`。启动图命令不处理 `icon` 配置，图标命令不要求 `figma.phone`。需要默认值时请删除该字段，不要写空值、`"false"` 或 `null`。`nodes: {}`、`ohos: {}`、`project: {}` 合法，分别表示使用默认查找和默认设置；`platforms: []` 不合法。
 
 ## 4. Figma 设计稿要求
 
@@ -269,7 +269,7 @@ Launch screen (Frame / Component / Instance)
 | `--dry-run` | `sync`、`create`、`preview` | 选填，默认关闭 | 计算并打印变化但不写文件；`sync` 仍访问网络、需要 Token；对只读的 `check` 没有额外效果 |
 | `--help` / `-h` | 全部 | 选填 | 显示帮助，不读取项目配置或访问网络 |
 
-`sync/preview` 不接受 `--platform`，它们针对完整设计快照。工具不支持 `--all`、平台列表参数或 `--remove`。预期配置/网络/文件错误通常以退出码 `2` 结束；退出码 `0` 表示该命令完成。
+`sync/preview` 不接受 `--platform`，它们针对完整设计快照。工具不支持 `--all`、平台列表参数或 `--remove`。独立的 App 图标命令见第 10 节。预期配置/网络/文件错误通常以退出码 `2` 结束；退出码 `0` 表示该命令完成。
 
 ```bash
 # 仅生成并检查 iOS
@@ -374,3 +374,174 @@ dart pub publish --dry-run
 [验证范围](doc/validation.md) · [发布说明](doc/publishing.md) · [MIT License](LICENSE)
 
 本工具与 Figma、Flutter 或平台厂商没有官方隶属关系。
+
+## 10. 桌面 App 图标
+
+图标功能与系统启动窗口的图标是两回事。**普通 `sync/create/check/preview` 命令仅处理启动图**；`icon sync/create/check/preview` 才处理桌面图标。只配置启动图的现有项目不需要任何修改。图标命令不会改启动 Storyboard、Android LaunchTheme、鸿蒙 `startWindowIcon` 或 `startWindowBackground`。
+
+### 最小图标配置
+
+例如仅生成 iPhone/iPad 图标：
+
+```yaml
+figma:
+  icon: https://www.figma.com/design/ExampleFileKey/AppIcon?node-id=2-1
+icon:
+  platforms: [ios]
+```
+
+这时不需要 `figma.phone`，也不需要图标分层。画板必须是无透明区域的正方形，否则需要明确配置 `icon.background_color`。多平台项目可在同一个 `figma_splash.yaml` 中同时保留 `figma.phone`、`figma.tablet`、`figma.icon` 和两组设置。
+
+### 完整图标配置示例
+
+以下示例列出图标专属字段，以及图标会使用的共享工程字段。示例 ID 不是可直接访问的设计，请替换成自己的链接与节点。
+
+<!-- BEGIN ICON CONFIG -->
+```yaml
+# 选填，默认 1；当前只支持整数 1。
+schema_version: 1
+
+# 必填，映射。
+figma:
+  # 图标命令必填。可用 URL 字符串简写，也可用下方对象写法。
+  # 必须是带 node-id 的 Figma design/file 链接。
+  # 省略：icon 命令报错，不会从 splash 画板里猜测或截取 Logo。
+  icon:
+    # 对象写法下必填；指向图标的正方形 Frame/Component/Instance。
+    url: https://www.figma.com/design/ExampleFileKey/AppIcon?node-id=2-1
+    # 选填。省略或 {}：按 icon/background、icon/foreground、icon/monochrome 查找。
+    # 可以部分映射；指定 ID 后不再按名称回退。节点必须是画板内可见后代。
+    # 按约定命名的设计稿应删除这些演示映射。
+    nodes:
+      # 选填；Android adaptive=true 时对应的背景图层必需。
+      background: "2:2"
+      # 选填；Android adaptive=true 时对应的前景图层必需。
+      foreground: "2:3"
+      # 选填；Android monochrome=true 时对应的单色轮廓图层必需。
+      monochrome: "2:4"
+
+# 选填。共享的平台默认范围；默认三个平台。
+# icon.platforms 省略时继承本项；本项也控制普通启动图命令。
+platforms: [android, ios, ohos]
+
+# 选填映射；省略整个 icon 使用以下各字段默认值。
+# 省略本段并不省略 figma.icon：执行 icon 命令仍必须有设计链接。
+icon:
+  # 选填非空列表；默认继承顶层 platforms（顶层也省略则为三端）。
+  # 可用值只有 android/ios/ohos；重复项合并，[]、null 或未知平台报错。
+  # 不存在对应平台工程时应移除该平台。不会自动创建原生工程。
+  platforms: [android, ios, ohos]
+
+  # 选填字符串，默认 figma_icon，与启动图的 resource_prefix 独立。
+  # 必须小写字母开头，后续仅小写字母、数字、下划线。
+  # 不能与启动图前缀相同；生成后改名会被拒绝，需先迁移旧资源和清单。
+  # 同时作为 iOS .appiconset 名称及 AppIcon 编译设置值。
+  resource_prefix: figma_icon
+
+  # 选填字符串，无默认底色，且不继承启动图 background_color。
+  # 仅接受带引号的 #RRGGBB。
+  # 全彩图标/自适应背景含透明像素时必填，否则生成失败。
+  # 不透明素材可省略。只填补透明区域，不覆盖已有颜色。
+  # 自适应前景和单色轮廓保留透明通道，不使用这个底色合成。
+  background_color: "#FFFFFF"
+
+  # 选填映射；未启用 Android 时，不要求 Android 的分层素材。
+  android:
+    # 选填布尔值，默认 true；"true"、null 等报错。
+    # true：生成 API 26+ 自适应图标，必须有对齐的背景/前景图层。
+    # false：只生成普通多密度图标；API 26+ 也使用普通图标回退。
+    adaptive: true
+    # 选填布尔值，默认 false。
+    # true：要求 adaptive=true 及独立透明轮廓，生成 API 33+ 单色图标。
+    # false/省略：不生成单色图标；从 true 改 false 后 create 会清理工具生成的单色资源。
+    monochrome: false
+
+# 选填映射。以下路径都相对于 --project，不相对于 YAML 所在目录。
+# 必须是工程内的相对路径；拒绝绝对路径、越界和输出符号链接。
+# 各路径独立取默认值，修改资源目录不会自动推导其他路径。
+project:
+  # 选填，默认 android/app/src/main/res；普通与自适应图标的资源根目录。
+  android_res: android/app/src/main/res
+  # 选填，默认 android/app/src/main/AndroidManifest.xml。
+  # Android 启用时必须存在，需有唯一 application。
+  # 修改 application icon/roundIcon；有独立图标的 launcher activity/alias 也一起更新。
+  android_manifest: android/app/src/main/AndroidManifest.xml
+  # 选填，默认 ios/Runner；AppIcon 写入其 Assets.xcassets。
+  # 同级必须有唯一 .xcodeproj；Target 选择和不支持的自动同步 Group 规则同第 6 节。
+  # 自动接入资产目录，并更新该应用所有构建配置的 AppIcon 名称，含已有条件化设置。
+  ios_runner: ios/Runner
+  # 选填，默认 ohos/entry/src/main；必须有 module.json5。
+  # 在指定 Ability 上更新 icon，其他 Ability 和启动窗口配置保持原值。
+  ohos_main: ohos/entry/src/main
+  # 选填，默认 ohos/AppScope；必须有 app.json5 的 app 对象。
+  # 在其 resources/base/media 下生成应用图标，并更新 app.icon。
+  ohos_app_scope: ohos/AppScope
+  # 选填，默认 EntryAbility；必须唯一匹配 module.abilities 内的 name。
+  # 不存在或有多个匹配时报错，不会自动选第一个。
+  ohos_ability: EntryAbility
+```
+<!-- END ICON CONFIG -->
+
+**必填关系：** 图标命令总是要求 `figma.icon`；其对象写法要求 `url`。所有其他图标字段都可省略，但默认启用三端和 Android 自适应图标，因此默认情况下需要三端工程与前景/背景图层。只有 iOS 或鸿蒙时，直接设置 `icon.platforms` 即可，不需要 Android 图层。`nodes` 字段选填不等于相应的设计图层选填。
+
+### Figma 画板与导出规则
+
+- 图标主画板必须正方形，逻辑边长 256～4096，推荐 1024。按固定版本导出到至少 1024×1024 的 PNG；拒绝矩形素材，不拉伸成正方形。
+- 仅生成普通图标时直接使用整个画板导出结果；不要在画板内放可见的参考线、标注或单色辅助层。
+- 启用 Android 自适应图标时，需要 `icon/background` 和 `icon/foreground`。两层外层容器必须与主画板同位置、同尺寸；前景内部保留透明留白。程序保留变换后的坐标对齐，不对角色自动居中或重新裁掉留白。
+- 自适应模式下，所有平台的全彩图标由指定背景和前景合成，避免 `icon/monochrome` 或其他辅助层混入全彩图标。整体画板 PNG 同步保存为参考。
+- Android 的自适应层对应 108×108 dp，重要图形应位于中心直径 66 dp 的安全区域；系统可能裁成圆形、圆角方形等。工具不会根据图像语义自动缩小 Logo，需要通过预览和设备验收检查边缘。
+- `icon/monochrome` 使用透明背景和非透明轮廓。工具将 RGB 统一为白色、保留 alpha，由桌面决定主题颜色；全透明或完全不透明的图层会报错，不能用白底黑图代替透明蒙版。
+- iOS/HarmonyOS 输出使用不透明全彩图，不预先烘焙圆角。当前不支持 iOS 独立深色/着色图标、Liquid Glass 分层图标、Android 多 flavor 分别配置或 HarmonyOS 分层图标。
+
+### 命令与文件
+
+```bash
+# 同步图标，不修改原生工程；需要 FIGMA_ACCESS_TOKEN。
+fvm dart run figma_native_splash:icon sync
+
+# 离线查看资源和原生接入变化。
+fvm dart run figma_native_splash:icon create --dry-run
+
+# 离线生成，然后检查文件与工程接入是否已经同步。
+fvm dart run figma_native_splash:icon create
+fvm dart run figma_native_splash:icon check
+
+# 从快照重新生成图标构图/裁切预览。
+fvm dart run figma_native_splash:icon preview
+
+# 仅生成已在 icon.platforms 中启用的 iOS。
+fvm dart run figma_native_splash:icon create --platform=ios
+```
+
+未使用 FVM 时把 `fvm dart` 换成 `dart`。全局安装后也可执行 `figma_native_splash icon create`；源码入口是 `dart run bin/icon.dart create`。
+
+| 参数 | 是否必填 / 默认值 | 用途及省略行为 |
+|---|---|---|
+| `--project` | 选填，当前目录 | 所有工程内路径的基准 |
+| `--config` | 选填，`figma_splash.yaml` | 相对于工程根目录；文件不存在会报错 |
+| `--platform` | 选填，无 | 仅适用于 create/check；省略处理全部 icon.platforms，一次只能选一个已启用的平台 |
+| `--dry-run` | 选填，关闭 | sync/create/preview 计算结果但不写入；sync 仍联网并要求 Token；check 本身只读 |
+| `--help` / `-h` | 选填 | 不读配置、不联网，显示帮助 |
+| `FIGMA_ACCESS_TOKEN` | sync 必需 | 与启动图相同的凭据规则，只发给 Figma API，不发给图片下载地址 |
+
+图标 `check` 比启动图的预生成检查更严格：图标素材、清单或原生接入有任何待更新项都返回退出码 `2`，提示先执行 `icon create`；同步且无冲突返回 `0`。错误不自动修复，不会写入工程。
+
+输出与状态：
+
+```text
+.figma_splash/
+├── icon_snapshot/             # 图标来源、版本、SHA-256 与原始 PNG
+├── icon_previews/             # 全彩图标与 Android 裁切示意，非设备截图
+├── generated_icon_android.json
+├── generated_icon_ios.json
+└── generated_icon_ohos.json
+```
+
+- 建议提交配置、图标快照、生成清单和原生资源；将 `.figma_splash/icon_previews/` 加入应用 `.gitignore`。
+- 改图标链接、节点映射，或改变需要下载的 Android 图层时重新 `icon sync`；只改合成底色直接 `icon create`。
+- Android 普通图标生成 48/72/96/144/192 px；自适应图层为 432 px，API 26/33 分别使用资源限定符。
+- iOS 生成 iPhone/iPad 所需图标规格（包括 iPad 167 px）及 1024 px 商店图；自动设置 AppIcon 名称并确保资产目录参与应用 Resources。
+- 鸿蒙在 AppScope 和指定模块各生成 1024 px PNG，分别更新 app.icon 与指定 Ability.icon；不修改包名、版本、权限或签名。
+- 生成文件有冲突或被手改时拒绝覆盖。关闭 adaptive/monochrome 并重新生成后，清理该平台本工具管理的过期资源；从 platforms 删掉整个平台不会自动删除该平台的已有资源。
+- 不自动移除 `flutter_launcher_icons`、旧桌面图标或其他工具配置。迁移应用时，先验证三端实际图标，再移除旧依赖和不再使用的资源。

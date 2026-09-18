@@ -1,5 +1,7 @@
 ## 0.1.0
 
+- Add independent Figma app icon sync/create/check/preview commands, Android adaptive and monochrome resources, iPhone/iPad AppIcon catalogs and HarmonyOS icon integration.
+
 - Fix missing iOS Xcode Resources registration; create now patches project.pbxproj idempotently and check reports incomplete storyboard integration.
 
 - Generate native Android, iOS and HarmonyOS splash resources from Figma design links.

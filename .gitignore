@@ -5,3 +5,5 @@ coverage/
 .hvigor/
 .pub/
 .env.*
+
+.figma_splash/icon_previews/

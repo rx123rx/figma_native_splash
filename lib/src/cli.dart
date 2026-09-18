@@ -10,8 +10,12 @@ import 'snapshot.dart';
 import 'generator.dart';
 import 'output.dart';
 import 'artwork.dart';
+import 'icon_cli.dart';
 
 Future<void> runCli(List<String> arguments, {String? command}) async {
+  if (command == null && arguments.isNotEmpty && arguments.first == 'icon') {
+    return runIconCli(arguments.sublist(1));
+  }
   final parser = ArgParser()
     ..addOption(
       'project',
@@ -30,7 +34,7 @@ Future<void> runCli(List<String> arguments, {String? command}) async {
     final args = parser.parse(arguments);
     if (args['help'] as bool) {
       stdout.writeln(
-        'figma_native_splash <sync|create|check|preview> [options]\n${parser.usage}',
+        'figma_native_splash <sync|create|check|preview> [options]\nfigma_native_splash icon <sync|create|check|preview> [options]\n${parser.usage}',
       );
       return;
     }

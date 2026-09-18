@@ -84,12 +84,15 @@ class FrameConfig {
   final FigmaLink link;
   final Map<String, String> nodes;
   FrameConfig(this.link, this.nodes);
-  factory FrameConfig.parse(dynamic value) {
+  factory FrameConfig.parse(
+    dynamic value, {
+    Set<String> roles = const {'background', 'foreground', 'branding'},
+  }) {
     if (value is String) return FrameConfig(FigmaLink.parse(value), {});
     final map = asMap(value, 'figma 画板');
     allowedKeys(map, {'url', 'nodes'}, 'figma 画板');
     final nodes = configMap(map, 'nodes');
-    allowedKeys(nodes, {'background', 'foreground', 'branding'}, 'nodes');
+    allowedKeys(nodes, roles, 'nodes');
     final result = <String, String>{};
     for (final entry in nodes.entries) {
       final node = configString(
@@ -131,7 +134,7 @@ class SplashConfig {
     if (!file.existsSync()) throw SplashException('未找到配置：${file.path}');
     return SplashConfig.parse(file.readAsStringSync());
   }
-  factory SplashConfig.parse(String text) {
+  factory SplashConfig.parse(String text, {bool requirePhone = true}) {
     final map = asMap(loadYaml(text), '配置');
     allowedKeys(map, {
       'schema_version',
@@ -141,16 +144,19 @@ class SplashConfig {
       'background_color',
       'project',
       'ohos',
+      'icon',
     }, '配置');
     if (map.containsKey('schema_version') &&
         (map['schema_version'] is! int || map['schema_version'] != 1)) {
       throw SplashException('不支持的 schema_version');
     }
     final figma = asMap(map['figma'], 'figma');
-    allowedKeys(figma, {'phone', 'tablet'}, 'figma');
-    if (!figma.containsKey('phone')) throw SplashException('必须提供 figma.phone');
+    allowedKeys(figma, {'phone', 'tablet', 'icon'}, 'figma');
+    if (requirePhone && !figma.containsKey('phone')) {
+      throw SplashException('生成启动图必须提供 figma.phone；仅生成图标请使用 icon 命令');
+    }
     final frames = {
-      for (final entry in figma.entries)
+      for (final entry in figma.entries.where((entry) => entry.key != 'icon'))
         entry.key: FrameConfig.parse(entry.value),
     };
     final rawPlatforms = map.containsKey('platforms')
@@ -199,6 +205,8 @@ class SplashConfig {
       'ohos_main',
       'ohos_page',
       'ohos_ability',
+      'android_manifest',
+      'ohos_app_scope',
     }, 'project');
     final defaults = {
       'android_res': 'android/app/src/main/res',

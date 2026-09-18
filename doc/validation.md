@@ -39,3 +39,24 @@ dart run bin/preview.dart --project=/tmp/figma-splash-validation
 ```
 
 The output directory must not exist. This fixture uses generated artwork only, opts into the OHOS layered view to exercise that code path, and does not need a token. Native compilation requires an appropriate host project and installed platform SDKs.
+
+
+## App icon validation
+
+- Icon-only and shared configuration, defaults, invalid inputs, documented YAML consistency, snapshot hashes, opaque compositing, adaptive-layer alignment and monochrome alpha masks are tested.
+- Mock Figma tests pin a version and verify that asset download requests do not carry credentials. Real icon export still needs an authorized Figma file/token; it has not been validated against a live icon design.
+- Generation tests cover Android application/launcher references, iPhone/iPad AppIcon sizes and all app build configurations, HarmonyOS AppScope and Ability references, comments, unrelated settings, cleanup when adaptive/monochrome are disabled, manual-edit protection, CLI dry-run/check and repeated generation.
+- Generated Android ordinary/adaptive/API 33 monochrome resources compiled and linked with Android SDK 36 (minSdk 21 fixture).
+- An isolated iOS simulator application built with the generated AppIcon; the packaged Info.plist identifies `figma_icon` for iPhone and iPad and contains the compiled asset catalog.
+- An isolated HarmonyOS application compiled and packaged successfully; both AppScope and Ability PNG resources are present in the unsigned HAP.
+- These are native build checks using synthetic artwork, not launcher screenshots or live Figma acceptance. Android/iOS/HarmonyOS launcher appearance, themed icons and physical devices still need visual acceptance with the consuming app's real design.
+
+Create an icon-only synthetic fixture:
+
+```bash
+dart run tool/create_icon_validation_project.dart /tmp/figma-icon-validation
+dart run bin/icon.dart check --project=/tmp/figma-icon-validation
+dart run bin/icon.dart preview --project=/tmp/figma-icon-validation
+```
+
+The output directory must not exist. The fixture validates generation; native compilation requires a complete platform host and installed SDKs.

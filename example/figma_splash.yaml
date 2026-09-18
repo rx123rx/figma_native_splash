@@ -5,7 +5,7 @@ schema_version: 1
 # 必填，映射。整个 figma 省略、为 null 或类型错误：报错。
 # 这里只支持 Figma 来源，没有本地图片输入配置。
 figma:
-  # 必填。接受「URL 字符串」或下方这种「url + nodes 映射」。
+  # 生成启动图时必填；仅使用 icon 命令时不需要 phone。接受「URL 字符串」或下方这种「url + nodes 映射」。
   # 省略 phone：报错，不会拿 tablet 自动代替手机稿。
   phone:
     # 对象写法下必填，非空字符串。
