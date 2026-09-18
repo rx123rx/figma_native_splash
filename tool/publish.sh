@@ -6,6 +6,7 @@ usage() {
 Usage: ./tool/publish.sh [--dry-run | --publish] [--fvm]
 
 Run dependency resolution, format checks, analysis, tests, and a pub.dev dry run.
+Publishing always uses https://pub.dev; dependency downloads use your current mirror.
 
   --dry-run  Validate the package without uploading it (default).
   --publish  Also publish after all checks pass, with Dart's confirmation prompt.
@@ -50,10 +51,11 @@ run_dart pub get
 run_dart format --output=none --set-exit-if-changed lib bin test tool example
 run_dart analyze
 run_dart test
-run_dart pub publish --dry-run
+# Override the dependency mirror only for publishing. pub.dev rejects publish_to.
+PUB_HOSTED_URL=https://pub.dev run_dart pub publish --dry-run
 
 if [[ "$mode" == '--publish' ]]; then
-  run_dart pub publish
+  PUB_HOSTED_URL=https://pub.dev run_dart pub publish
 else
   printf '\nDry run complete. To publish, run: ./tool/publish.sh --publish'
   if [[ "${dart_command[0]}" == 'fvm' ]]; then
