@@ -22,13 +22,14 @@
 旧设计稿保留原名称，配置角色对应的节点 ID：
 
 ```yaml
-figma:
-  phone:
-    url: https://www.figma.com/design/文件ID?node-id=1-2
-    nodes:
-      background: "10:1"
-      foreground: "10:2"
-      branding: "10:3"
+splash:
+  figma:
+    phone:
+      url: https://www.figma.com/design/文件ID?node-id=1-2
+      nodes:
+        background: "10:1"
+        foreground: "10:2"
+        branding: "10:3"
 ```
 
 映射必须指向该画板内可见的后代节点。工具会拒绝缺失、重复、隐藏或越出指定画板关系的映射。背景容器尺寸必须与画板一致；背景内部可有渐变、模糊图层等。

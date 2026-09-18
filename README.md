@@ -32,20 +32,40 @@ dev_dependencies:
 
 ## 2. 最小配置与首次运行
 
+配置按功能分成顶层 **`icon`**（桌面图标）和 **`splash`**（启动图）两段。每段自己的 `figma`、`platforms`、`resource_prefix`、`background_color` 和 `project` 独立生效，互不继承。只用其中一种功能时，可以省略另一段。两种功能一起使用时，可直接复制[完整配置示例](#complete-config)，`schema_version` 只写一次。
+
+```yaml
+schema_version: 1
+icon:
+  figma: https://www.figma.com/design/ExampleFileKey/AppIcon?node-id=2-1
+  platforms: [android, ios]
+  android:
+    adaptive: false
+splash:
+  figma:
+    phone: https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2
+    tablet: https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-3
+  platforms: [android, ios]
+```
+
+上例图标使用无透明区域的完整正方形画板；启动图仍按三个角色分层。命令保持不变，普通命令读取 `splash`，`icon` 命令读取 `icon`。
+
 在 App 根目录新建 **`figma_splash.yaml`**。如果设计稿使用约定图层名，最少只需要手机链接：
 
 ```yaml
-figma:
-  # 必填：指向启动图画板，必须带 node-id。不能只提供整个文件的链接。
-  phone: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2"
+splash:
+  figma:
+    # 必填：指向启动图画板，必须带 node-id。不能只提供整个文件的链接。
+    phone: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2"
 ```
 
-上述最小配置默认启用三个平台。**普通 Flutter 项目没有鸿蒙目录时，必须把 `platforms` 改成实际存在的平台**，例如：
+上述最小配置默认启用三个平台。**普通 Flutter 项目没有鸿蒙目录时，必须把 `splash.platforms` 改成实际存在的平台**，例如：
 
 ```yaml
-figma:
-  phone: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2"
-platforms: [android, ios]
+splash:
+  figma:
+    phone: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2"
+  platforms: [android, ios]
 ```
 
 在终端或 CI 密钥管理中设置 `FIGMA_ACCESS_TOKEN`，不要写入 YAML 或 Git。这个环境变量只在 `sync` 时需要；登录 Figma 网页或编辑器并不会自动为命令行提供 Token。
@@ -66,162 +86,240 @@ dart run figma_native_splash:check
 
 首次 `sync` 之前执行 `check/create/preview` 会提示缺少快照，**不会自行联网下载**。修改设计后再次主动执行 `sync`，再生成、检查 diff 并运行 App 验收。
 
-## 3. 完整配置示例：每个选项都有注释
+<a id="complete-config"></a>
 
-下面列出了启动图的全部 YAML 配置项；独立图标配置见第 10 节。可以整段复制后替换链接和节点；不需要的选填项可删除。图层命名已符合约定时，建议删除 `nodes` 映射，避免复制演示 ID 后找不到图层。
+## 3. 完整配置示例：icon + splash
 
-<!-- BEGIN FULL CONFIG -->
+下面是一份完整的 `figma_splash.yaml`，同时包含桌面图标和手机/Pad 启动图的全部配置项，可整段复制。每项都注明必填性、默认值和省略行为。
+
+请替换演示链接与节点 ID，并在两段中分别选择实际存在的平台；图层已按约定命名时，删除相应 `nodes` 映射即可。只使用一种功能时可删除另一整段。示例开启 Android 自适应图标，需要图标稿提供对齐的背景和前景图层；只有完整正方形图标稿时将 `icon.android.adaptive` 设为 `false`。
+
+<!-- BEGIN COMPLETE CONFIG -->
 ```yaml
-# 选填，整数，默认 1。目前只接受 1。
-# 省略：按当前配置格式解析。填写其他数字、字符串或 null：报错。
+# 选填，配置格式版本（不是 App 或插件版本），默认 1。
+# 当前只接受整数 1；省略时按当前格式解析，其他值或 null 报错。
 schema_version: 1
 
-# 必填，映射。整个 figma 省略、为 null 或类型错误：报错。
-# 这里只支持 Figma 来源，没有本地图片输入配置。
-figma:
-  # 生成启动图时必填；仅使用 icon 命令时不需要 phone。接受「URL 字符串」或下方这种「url + nodes 映射」。
-  # 省略 phone：报错，不会拿 tablet 自动代替手机稿。
-  phone:
-    # 对象写法下必填，非空字符串。
-    # 必须是 https://figma.com 或 https://www.figma.com 的 design/file 链接，
-    # 并带有 node-id；节点应为 Frame、Component 或 Instance 画板。
-    # 省略/无 node-id/错误域名/错误类型：报错。
-    url: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2"
-
-    # 选填，映射；用于不想改图层名字的旧设计稿。
-    # 省略 nodes 或传 {}：三个角色均按 splash/<角色名> 自动查找。
-    # 可以只映射其中一个角色，其他角色仍按名称查找。
-    # 一旦指定某个角色的 ID，就只按 ID 查找，不再回退到名字。
+# 图标命令必填，映射；只使用启动图命令时可省略整个 icon。
+icon:
+  # 必填，可用 URL 字符串简写，或下方 url + nodes 对象。
+  # 必须带 node-id；省略时报错，不会从 splash 截取图标。
+  figma:
+    # 对象写法下必填；指向图标的正方形 Frame/Component/Instance。
+    url: https://www.figma.com/design/ExampleFileKey/AppIcon?node-id=2-1
+    # 选填。省略或 {}：按 icon/background、icon/foreground、icon/monochrome 查找。
+    # 可以部分映射；指定 ID 后不再按名称回退。节点必须是画板内可见后代。
+    # 按约定命名的设计稿应删除这些演示映射。
     nodes:
-      # 选填，字符串节点 ID，支持 "10:1" 或 "10-1"。
-      # 省略：查找唯一可见的 splash/background 图层。
-      # 该图层必须属于当前画板，且容器边界覆盖整个画板。
-      background: "10:1"
+      # 选填；Android adaptive=true 时对应的背景图层必需。
+      background: "2:2"
+      # 选填；Android adaptive=true 时对应的前景图层必需。
+      foreground: "2:3"
+      # 选填；Android monochrome=true 时对应的单色轮廓图层必需。
+      monochrome: "2:4"
 
-      # 选填，字符串节点 ID。
-      # 省略：查找唯一可见的 splash/foreground 图层。
-      # 导出主文案及装饰；图片保持宽高比，不能混入状态栏截图。
-      foreground: "10:2"
+  # 选填非空列表；默认 [android, ios, ohos]；不继承 splash.platforms。
+  # 可用值只有 android/ios/ohos；重复项合并，[]、null 或未知平台报错。
+  # 不存在对应平台工程时应移除该平台。不会自动创建原生工程。
+  platforms: [android, ios, ohos]
 
-      # 选填，字符串节点 ID。
-      # 省略：查找唯一可见的 splash/branding 图层。
-      # 导出底部 Logo、名称和标语；不填写 ID 不代表省略品牌图层。
-      branding: "10:3"
+  # 选填字符串，默认 figma_icon，与 splash.resource_prefix 独立。
+  # 必须小写字母开头，后续仅小写字母、数字、下划线。
+  # 不能与启动图前缀相同；生成后改名会被拒绝，需先迁移旧资源和清单。
+  # 同时作为 iOS .appiconset 名称及 AppIcon 编译设置值。
+  resource_prefix: figma_icon
 
-  # 选填，类型和 phone 完全相同，支持 URL 简写或对象写法。
-  # 省略：复用手机稿素材与参考尺寸；宽屏会适配，但不会凭空生成 Pad 设计，
-  # 主视觉/品牌的最大参考宽度仍受手机稿限制。
-  # 若提供 tablet，它的 url 在对象写法下必填，nodes 仍是选填。
-  tablet:
-    url: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-3"
-    nodes:
-      # 这三个节点必须属于 tablet 链接指向的画板，而不是手机画板。
-      # 逐项省略时，分别回退为该画板内的 splash/background、
-      # splash/foreground、splash/branding 名称查找。
-      background: "20:1"
-      foreground: "20:2"
-      branding: "20:3"
+  # 选填字符串，无默认底色，且不继承启动图 background_color。
+  # 仅接受带引号的 #RRGGBB。
+  # 全彩图标/自适应背景含透明像素时必填，否则生成失败。
+  # 不透明素材可省略。只填补透明区域，不覆盖已有颜色。
+  # 自适应前景和单色轮廓保留透明通道，不使用这个底色合成。
+  background_color: "#FFFFFF"
 
-# 选填，非空字符串列表，默认 [android, ios, ohos]。
-# 仅接受 android、ios、ohos；重复项会合并。
-# 省略：check/create 默认处理三个平台，缺少任意平台工程时会报错。
-# 只有 Android/iOS 工程时请写 [android, ios]，只有鸿蒙则写 [ohos]。
-# 此项控制原生生成范围，不减少 sync 下载的设计画板或图层。
-platforms: [android, ios, ohos]
+  # 选填映射；未启用 Android 时，不要求 Android 的分层素材。
+  android:
+    # 选填布尔值，默认 true；"true"、null 等报错。
+    # true：生成 API 26+ 自适应图标，必须有对齐的背景/前景图层。
+    # false：只生成普通多密度图标；API 26+ 也使用普通图标回退。
+    adaptive: true
+    # 选填布尔值，默认 false。
+    # true：要求 adaptive=true 及独立透明轮廓，生成 API 33+ 单色图标。
+    # false/省略：不生成单色图标；从 true 改 false 后 create 会清理工具生成的单色资源。
+    monochrome: false
 
-# 选填，非空字符串，默认 figma_splash。
-# 只允许小写英文字母开头，后续为小写字母、数字、下划线。
-# 用作生成的资源名及 iOS Storyboard 名字前缀，降低已有文件重名风险。
-# 省略：使用 figma_splash。不能用包名中的点号、连字符或大写字母。
-# 第一次生成后改这个值会被拒绝，需要先显式迁移旧资源与生成清单。
-# 它不会修改 App 包名、Bundle ID、鸿蒙 builder 类名或快照目录。
-resource_prefix: figma_splash
+  # 选填映射。以下路径都相对于 --project，不相对于 YAML 所在目录。
+  # 必须是工程内的相对路径；拒绝绝对路径、越界和输出符号链接。
+  # 各路径独立取默认值，修改资源目录不会自动推导其他路径。
+  project:
+    # 选填，默认 android/app/src/main/res；普通与自适应图标的资源根目录。
+    android_res: android/app/src/main/res
+    # 选填，默认 android/app/src/main/AndroidManifest.xml。
+    # Android 启用时必须存在，需有唯一 application。
+    # 修改 application icon/roundIcon；有独立图标的 launcher activity/alias 也一起更新。
+    android_manifest: android/app/src/main/AndroidManifest.xml
+    # 选填，默认 ios/Runner；AppIcon 写入其 Assets.xcassets。
+    # 同级必须有唯一 .xcodeproj；Target 选择和不支持的自动同步 Group 规则同第 6 节。
+    # 自动接入资产目录，并更新该应用所有构建配置的 AppIcon 名称，含已有条件化设置。
+    ios_runner: ios/Runner
+    # 选填，默认 ohos/entry/src/main；必须有 module.json5。
+    # 在指定 Ability 上更新 icon，其他 Ability 和启动窗口配置保持原值。
+    ohos_main: ohos/entry/src/main
+    # 选填，默认 ohos/AppScope；必须有 app.json5 的 app 对象。
+    # 在其 resources/base/media 下生成应用图标，并更新 app.icon。
+    ohos_app_scope: ohos/AppScope
+    # 选填，默认 EntryAbility；必须唯一匹配 module.abilities 内的 name。
+    # 不存在或有多个匹配时报错，不会自动选第一个。
+    ohos_ability: EntryAbility
 
-# 选填，字符串，默认 "#FFFFFF"。必须加引号，且仅接受 #RRGGBB。
-# 省略：Android 12+ / 鸿蒙系统启动窗口使用白色底色，透明图层也以白色打底。
-# 不会从 Figma 自动吸取颜色。Android 12+ 的系统窗口只能使用纯色背景。
-# 同时用于部分平台启动区域/系统栏底色和构图预览，不会改 App 内主题。
-# 不支持 #RGB、#AARRGGBB、透明色或渐变字符串。
-background_color: "#FFFFFF"
+# 启动图命令必填；只使用 icon 命令时可省略整个 splash。
+splash:
+  # 必填，映射。splash.figma 省略、为 null 或类型错误：报错。
+  # 这里只支持 Figma 来源，没有本地图片输入配置。
+  figma:
+    # 生成启动图时必填；仅使用 icon 命令时不需要 phone。接受「URL 字符串」或下方这种「url + nodes 映射」。
+    # 省略 phone：报错，不会拿 tablet 自动代替手机稿。
+    phone:
+      # 对象写法下必填，非空字符串。
+      # 必须是 https://figma.com 或 https://www.figma.com 的 design/file 链接，
+      # 并带有 node-id；节点应为 Frame、Component 或 Instance 画板。
+      # 省略/无 node-id/错误域名/错误类型：报错。
+      url: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2"
 
-# 选填，映射。省略整个 ohos 等价于 app_splash: false。
-# platforms 未启用 ohos 时，该设置不产生鸿蒙文件。
-ohos:
-  # 选填，布尔值，默认 false；只能写 true/false，不能加引号。
-  # false/省略：仅配置鸿蒙系统启动窗口，不添加第二阶段分层宣传图。
-  # true：额外接入 FlutterPage.splashScreenView，在 Flutter 首帧前显示宣传图。
-  # 不添加固定展示时长；系统窗口何时消失仍由系统和引擎控制。
-  # 从 true 改成 false 并重新 create：清理本工具生成的 builder、引用及分层资源，
-  # 保留系统图标和背景。项目原有自定义 builder 不会被关闭操作删除。
-  app_splash: false
+      # 选填，映射；用于不想改图层名字的旧设计稿。
+      # 省略 nodes 或传 {}：三个角色均按 splash/<角色名> 自动查找。
+      # 可以只映射其中一个角色，其他角色仍按名称查找。
+      # 一旦指定某个角色的 ID，就只按 ID 查找，不再回退到名字。
+      nodes:
+        # 选填，字符串节点 ID，支持 "10:1" 或 "10-1"。
+        # 省略：查找唯一可见的 splash/background 图层。
+        # 该图层必须属于当前画板，且容器边界覆盖整个画板。
+        background: "10:1"
 
-# 选填，映射；标准 Flutter 工程可以整个省略。
-# 以下路径均相对于 --project 指定的项目根目录，而不是 YAML 文件所在目录。
-# 路径必须为项目内的非空相对路径，不允许绝对路径、../ 越界或反斜杠。
-# 工具拒绝经过符号链接的输出路径。
-project:
-  # 选填，默认 android/app/src/main/res。
-  # Android 资源根目录；其中 values/styles.xml 必须有唯一 LaunchTheme。
-  # 省略：使用标准路径。多 flavor 工程需要自行选择要修改的资源目录。
-  android_res: android/app/src/main/res
+        # 选填，字符串节点 ID。
+        # 省略：查找唯一可见的 splash/foreground 图层。
+        # 导出主文案及装饰；图片保持宽高比，不能混入状态栏截图。
+        foreground: "10:2"
 
-  # 选填，默认 ios/Runner。
-  # iOS Runner 目录；必须有 Info.plist，工具会写入其 Assets.xcassets / Base.lproj。
-  # 同级目录必须存在唯一 .xcodeproj；工具会自动修改其中的 project.pbxproj。
-  # 多应用 Target 时优先选择与该目录同名的应用 Target，否则必须只有一个应用 Target。
-  # 缺少工程或 Target 无法唯一定位：报错，不只写图片后假定接入成功。
-  # 省略：使用标准 Runner。不是 .xcodeproj 路径，也不是整个 ios 根目录。
-  ios_runner: ios/Runner
+        # 选填，字符串节点 ID。
+        # 省略：查找唯一可见的 splash/branding 图层。
+        # 导出底部 Logo、名称和标语；不填写 ID 不代表省略品牌图层。
+        branding: "10:3"
 
-  # 选填，默认 ohos/entry/src/main。
-  # 鸿蒙模块 main 目录，必须包含 module.json5；媒体资源写入 resources/base。
-  # 省略：使用标准 entry 模块。
-  # 修改此项不会自动修改下面的 ohos_page，两项默认值彼此独立。
-  ohos_main: ohos/entry/src/main
+    # 选填，类型和 phone 完全相同，支持 URL 简写或对象写法。
+    # 省略：复用手机稿素材与参考尺寸；宽屏会适配，但不会凭空生成 Pad 设计，
+    # 主视觉/品牌的最大参考宽度仍受手机稿限制。
+    # 若提供 tablet，它的 url 在对象写法下必填，nodes 仍是选填。
+    tablet:
+      url: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-3"
+      nodes:
+        # 这三个节点必须属于 tablet 链接指向的画板，而不是手机画板。
+        # 逐项省略时，分别回退为该画板内的 splash/background、
+        # splash/foreground、splash/branding 名称查找。
+        background: "20:1"
+        foreground: "20:2"
+        branding: "20:3"
 
-  # 选填，默认 ohos/entry/src/main/ets/pages/Index.ets。
-  # app_splash=true 时必须存在，且包含唯一 FlutterPage({...}) 调用。
-  # app_splash=false 的新工程可以没有此文件；关闭已有接入时会检查并移除本工具引用。
-  # 省略：使用标准入口页。自定义模块/入口页时，应和 ohos_main 一起设置。
-  ohos_page: ohos/entry/src/main/ets/pages/Index.ets
+  # 选填，非空字符串列表，默认 [android, ios, ohos]。
+  # 仅接受 android、ios、ohos；重复项会合并。
+  # 省略：check/create 默认处理三个平台，缺少任意平台工程时会报错。
+  # 只有 Android/iOS 工程时请写 [android, ios]，只有鸿蒙则写 [ohos]。
+  # 此项控制原生生成范围，不减少 sync 下载的设计画板或图层。
+  platforms: [android, ios, ohos]
 
-  # 选填，非空字符串，默认 EntryAbility。
-  # 必须对应 module.json5 中可唯一定位的 Ability name；不是包名或文件路径。
-  # 省略：查找 EntryAbility。找不到/不唯一：报错，不猜测使用其他 Ability。
-  ohos_ability: EntryAbility
+  # 选填，非空字符串，默认 figma_splash。
+  # 只允许小写英文字母开头，后续为小写字母、数字、下划线。
+  # 用作生成的资源名及 iOS Storyboard 名字前缀，降低已有文件重名风险。
+  # 省略：使用 figma_splash。不能用包名中的点号、连字符或大写字母。
+  # 第一次生成后改这个值会被拒绝，需要先显式迁移旧资源与生成清单。
+  # 它不会修改 App 包名、Bundle ID、鸿蒙 builder 类名或快照目录。
+  resource_prefix: figma_splash
+
+  # 选填，字符串，默认 "#FFFFFF"。必须加引号，且仅接受 #RRGGBB。
+  # 省略：Android 12+ / 鸿蒙系统启动窗口使用白色底色，透明图层也以白色打底。
+  # 不会从 Figma 自动吸取颜色。Android 12+ 的系统窗口只能使用纯色背景。
+  # 同时用于部分平台启动区域/系统栏底色和构图预览，不会改 App 内主题。
+  # 不支持 #RGB、#AARRGGBB、透明色或渐变字符串。
+  background_color: "#FFFFFF"
+
+  # 选填，映射。省略整个 ohos 等价于 app_splash: false。
+  # platforms 未启用 ohos 时，该设置不产生鸿蒙文件。
+  ohos:
+    # 选填，布尔值，默认 false；只能写 true/false，不能加引号。
+    # false/省略：仅配置鸿蒙系统启动窗口，不添加第二阶段分层宣传图。
+    # true：额外接入 FlutterPage.splashScreenView，在 Flutter 首帧前显示宣传图。
+    # 不添加固定展示时长；系统窗口何时消失仍由系统和引擎控制。
+    # 从 true 改成 false 并重新 create：清理本工具生成的 builder、引用及分层资源，
+    # 保留系统图标和背景。项目原有自定义 builder 不会被关闭操作删除。
+    app_splash: false
+
+  # 选填，映射；标准 Flutter 工程可以整个省略。
+  # 以下路径均相对于 --project 指定的项目根目录，而不是 YAML 文件所在目录。
+  # 路径必须为项目内的非空相对路径，不允许绝对路径、../ 越界或反斜杠。
+  # 工具拒绝经过符号链接的输出路径。
+  project:
+    # 选填，默认 android/app/src/main/res。
+    # Android 资源根目录；其中 values/styles.xml 必须有唯一 LaunchTheme。
+    # 省略：使用标准路径。多 flavor 工程需要自行选择要修改的资源目录。
+    android_res: android/app/src/main/res
+
+    # 选填，默认 ios/Runner。
+    # iOS Runner 目录；必须有 Info.plist，工具会写入其 Assets.xcassets / Base.lproj。
+    # 同级目录必须存在唯一 .xcodeproj；工具会自动修改其中的 project.pbxproj。
+    # 多应用 Target 时优先选择与该目录同名的应用 Target，否则必须只有一个应用 Target。
+    # 缺少工程或 Target 无法唯一定位：报错，不只写图片后假定接入成功。
+    # 省略：使用标准 Runner。不是 .xcodeproj 路径，也不是整个 ios 根目录。
+    ios_runner: ios/Runner
+
+    # 选填，默认 ohos/entry/src/main。
+    # 鸿蒙模块 main 目录，必须包含 module.json5；媒体资源写入 resources/base。
+    # 省略：使用标准 entry 模块。
+    # 修改此项不会自动修改下面的 ohos_page，两项默认值彼此独立。
+    ohos_main: ohos/entry/src/main
+
+    # 选填，默认 ohos/entry/src/main/ets/pages/Index.ets。
+    # app_splash=true 时必须存在，且包含唯一 FlutterPage({...}) 调用。
+    # app_splash=false 的新工程可以没有此文件；关闭已有接入时会检查并移除本工具引用。
+    # 省略：使用标准入口页。自定义模块/入口页时，应和 ohos_main 一起设置。
+    ohos_page: ohos/entry/src/main/ets/pages/Index.ets
+
+    # 选填，非空字符串，默认 EntryAbility。
+    # 必须对应 module.json5 中可唯一定位的 Ability name；不是包名或文件路径。
+    # 省略：查找 EntryAbility。找不到/不唯一：报错，不猜测使用其他 Ability。
+    ohos_ability: EntryAbility
 ```
-<!-- END FULL CONFIG -->
+<!-- END COMPLETE CONFIG -->
 
 ### 必填性与省略行为速查
 
 | 配置项 | 类型 | 是否必填 | 省略时的行为 |
 |---|---|---|---|
 | `schema_version` | 整数 | 否 | 使用 `1`，只支持此版本 |
-| `figma` | 映射 | **是** | 报错 |
-| `figma.phone` | URL 字符串或映射 | **启动图命令必填** | 报错；独立 icon 命令无需此项 |
-| `figma.phone.url` | 字符串 | **对象写法时是** | 报错；URL 简写不需要这个键 |
-| `figma.phone.nodes` | 映射 | 否 | 三个角色都按约定名字查找 |
-| `figma.phone.nodes.background` | 节点 ID 字符串 | 否 | 查找 `splash/background` |
-| `figma.phone.nodes.foreground` | 节点 ID 字符串 | 否 | 查找 `splash/foreground` |
-| `figma.phone.nodes.branding` | 节点 ID 字符串 | 否 | 查找 `splash/branding` |
-| `figma.tablet` | URL 字符串或映射 | 否 | 复用手机设计；不额外下载 Pad 画板 |
-| `figma.tablet.url` | 字符串 | **提供 tablet 对象时是** | 报错 |
-| `figma.tablet.nodes` 及三个子项 | 映射 / 节点 ID 字符串 | 否 | 与手机规则一致，但在 Pad 画板内查找 |
-| `platforms` | 非空列表 | 否 | 处理 `android`、`ios`、`ohos` |
-| `resource_prefix` | 字符串 | 否 | 使用 `figma_splash` |
-| `background_color` | 颜色字符串 | 否 | 使用 `"#FFFFFF"` |
-| `ohos` | 映射 | 否 | 鸿蒙使用默认行为 |
-| `ohos.app_splash` | 布尔值 | 否 | `false`，不添加第二阶段宣传图 |
-| `project` | 映射 | 否 | 使用标准 Flutter 原生目录 |
-| `project.android_res` | 相对路径字符串 | 否 | `android/app/src/main/res` |
-| `project.ios_runner` | 相对路径字符串 | 否 | `ios/Runner` |
-| `project.ohos_main` | 相对路径字符串 | 否 | `ohos/entry/src/main` |
-| `project.ohos_page` | 相对路径字符串 | 否 | `ohos/entry/src/main/ets/pages/Index.ets` |
-| `project.ohos_ability` | 字符串 | 否 | `EntryAbility` |
+| `splash` | 映射 | **启动图命令必填** | 报错；仅图标命令可省略 |
+| `splash.figma` | 映射 | **是** | 报错 |
+| `splash.figma.phone` | URL 字符串或映射 | **启动图命令必填** | 报错；独立 icon 命令无需此项 |
+| `splash.figma.phone.url` | 字符串 | **对象写法时是** | 报错；URL 简写不需要这个键 |
+| `splash.figma.phone.nodes` | 映射 | 否 | 三个角色都按约定名字查找 |
+| `splash.figma.phone.nodes.background` | 节点 ID 字符串 | 否 | 查找 `splash/background` |
+| `splash.figma.phone.nodes.foreground` | 节点 ID 字符串 | 否 | 查找 `splash/foreground` |
+| `splash.figma.phone.nodes.branding` | 节点 ID 字符串 | 否 | 查找 `splash/branding` |
+| `splash.figma.tablet` | URL 字符串或映射 | 否 | 复用手机设计；不额外下载 Pad 画板 |
+| `splash.figma.tablet.url` | 字符串 | **提供 tablet 对象时是** | 报错 |
+| `splash.figma.tablet.nodes` 及三个子项 | 映射 / 节点 ID 字符串 | 否 | 与手机规则一致，但在 Pad 画板内查找 |
+| `splash.platforms` | 非空列表 | 否 | 处理 `android`、`ios`、`ohos` |
+| `splash.resource_prefix` | 字符串 | 否 | 使用 `figma_splash` |
+| `splash.background_color` | 颜色字符串 | 否 | 使用 `"#FFFFFF"` |
+| `splash.ohos` | 映射 | 否 | 鸿蒙使用默认行为 |
+| `splash.ohos.app_splash` | 布尔值 | 否 | `false`，不添加第二阶段宣传图 |
+| `splash.project` | 映射 | 否 | 使用标准 Flutter 原生目录 |
+| `splash.project.android_res` | 相对路径字符串 | 否 | `android/app/src/main/res` |
+| `splash.project.ios_runner` | 相对路径字符串 | 否 | `ios/Runner` |
+| `splash.project.ohos_main` | 相对路径字符串 | 否 | `ohos/entry/src/main` |
+| `splash.project.ohos_page` | 相对路径字符串 | 否 | `ohos/entry/src/main/ets/pages/Index.ets` |
+| `splash.project.ohos_ability` | 字符串 | 否 | `EntryAbility` |
 
 **配置项选填不代表对应设计图层可以缺失。** `background`、`foreground`、`branding` 三个角色都必须在设计稿中存在，即使只生成鸿蒙系统启动窗口。`nodes` 只是改变角色的查找方式。
 
-各命令校验自身配置范围内的未知字段、错误类型和显式 `null`。启动图命令不处理 `icon` 配置，图标命令不要求 `figma.phone`。需要默认值时请删除该字段，不要写空值、`"false"` 或 `null`。`nodes: {}`、`ohos: {}`、`project: {}` 合法，分别表示使用默认查找和默认设置；`platforms: []` 不合法。
+根节点仅接受 `schema_version`、`icon`、`splash`，出现的功能段必须是映射。各命令校验自身配置范围内的未知字段、错误类型和显式 `null`。启动图命令不处理 `icon` 配置，图标命令不要求 `splash.figma.phone`。需要默认值时请删除该字段，不要写空值、`"false"` 或 `null`。`nodes: {}`、`ohos: {}`、`project: {}` 合法，分别表示使用默认查找和默认设置；`platforms: []` 不合法。
 
 ## 4. Figma 设计稿要求
 
@@ -338,7 +436,7 @@ figma_splash.yaml
 建议提交配置、快照、生成清单和原生文件，让构建机器离线生成。预览可加入 `.gitignore`：`.figma_splash/previews/`。这类原生素材不需要再加入 Flutter `assets` 声明，否则可能重复打包。
 
 - 同一个 Figma 文件的多个画板固定到同一文件版本，再按该版本导出图片；手机和 Pad 可以来自不同文件。
-- 改链接、节点映射或增删 Pad 后必须重新 `sync`。只改颜色、平台选择或 `ohos.app_splash` 后直接 `create` 即可。
+- 改链接、节点映射或增删 Pad 后必须重新 `sync`。只改颜色、平台选择或 `splash.ohos.app_splash` 后直接 `create` 即可。
 - 图片哈希不符时拒绝生成；不要手工替换快照里的 PNG。
 - 重复生成相同内容不产生额外文件差异。
 - 首次遇到同名但不同内容的资源、已生成资源被手动修改，都会报错，不静默覆盖。更改资源前缀/工程目录时应先明确迁移旧接入和资源，工具不是通用重命名器。
@@ -369,7 +467,7 @@ dart test
 dart pub publish --dry-run
 ```
 
-配置样例在本文维护，同时在 [example/figma_splash.yaml](example/figma_splash.yaml) 提供同内容文件；测试会检查两者一致，并验证所有字段可以被解析。无需访问 Figma 的代码调用示例见 [example/example.dart](example/example.dart)。
+完整配置样例在本文维护；[example/figma_icon.yaml](example/figma_icon.yaml) 和 [example/figma_splash.yaml](example/figma_splash.yaml) 分别提供单功能配置。测试会检查完整示例的两段与独立文件一致，并验证所有字段可以被解析。无需访问 Figma 的代码调用示例见 [example/example.dart](example/example.dart)。
 
 [验证范围](doc/validation.md) · [发布说明](doc/publishing.md) · [MIT License](LICENSE)
 
@@ -377,112 +475,25 @@ dart pub publish --dry-run
 
 ## 10. 桌面 App 图标
 
-图标功能与系统启动窗口的图标是两回事。**普通 `sync/create/check/preview` 命令仅处理启动图**；`icon sync/create/check/preview` 才处理桌面图标。只配置启动图的现有项目不需要任何修改。图标命令不会改启动 Storyboard、Android LaunchTheme、鸿蒙 `startWindowIcon` 或 `startWindowBackground`。
+图标功能与系统启动窗口的图标是两回事。**普通 `sync/create/check/preview` 命令仅处理启动图**；`icon sync/create/check/preview` 才处理桌面图标。只配置启动图的项目可省略整个 `icon` 段。图标命令不会改启动 Storyboard、Android LaunchTheme、鸿蒙 `startWindowIcon` 或 `startWindowBackground`。
 
 ### 最小图标配置
 
 例如仅生成 iPhone/iPad 图标：
 
 ```yaml
-figma:
-  icon: https://www.figma.com/design/ExampleFileKey/AppIcon?node-id=2-1
 icon:
+  figma: https://www.figma.com/design/ExampleFileKey/AppIcon?node-id=2-1
   platforms: [ios]
 ```
 
-这时不需要 `figma.phone`，也不需要图标分层。画板必须是无透明区域的正方形，否则需要明确配置 `icon.background_color`。多平台项目可在同一个 `figma_splash.yaml` 中同时保留 `figma.phone`、`figma.tablet`、`figma.icon` 和两组设置。
+这时不需要 `splash.figma.phone`，也不需要图标分层。画板必须是无透明区域的正方形，否则需要明确配置 `icon.background_color`。多平台项目可在同一个 `figma_splash.yaml` 中同时保留 `splash.figma.phone`、`splash.figma.tablet`、`icon.figma` 和两组设置。
 
-### 完整图标配置示例
+### 完整配置与必填关系
 
-以下示例列出图标专属字段，以及图标会使用的共享工程字段。示例 ID 不是可直接访问的设计，请替换成自己的链接与节点。
+图标的全部字段已放在第 3 节的[完整配置示例](#complete-config)中，与 `splash` 一起展示；无需手动拼接两个示例。只需要图标时也可参考 [example/figma_icon.yaml](example/figma_icon.yaml)。
 
-<!-- BEGIN ICON CONFIG -->
-```yaml
-# 选填，默认 1；当前只支持整数 1。
-schema_version: 1
-
-# 必填，映射。
-figma:
-  # 图标命令必填。可用 URL 字符串简写，也可用下方对象写法。
-  # 必须是带 node-id 的 Figma design/file 链接。
-  # 省略：icon 命令报错，不会从 splash 画板里猜测或截取 Logo。
-  icon:
-    # 对象写法下必填；指向图标的正方形 Frame/Component/Instance。
-    url: https://www.figma.com/design/ExampleFileKey/AppIcon?node-id=2-1
-    # 选填。省略或 {}：按 icon/background、icon/foreground、icon/monochrome 查找。
-    # 可以部分映射；指定 ID 后不再按名称回退。节点必须是画板内可见后代。
-    # 按约定命名的设计稿应删除这些演示映射。
-    nodes:
-      # 选填；Android adaptive=true 时对应的背景图层必需。
-      background: "2:2"
-      # 选填；Android adaptive=true 时对应的前景图层必需。
-      foreground: "2:3"
-      # 选填；Android monochrome=true 时对应的单色轮廓图层必需。
-      monochrome: "2:4"
-
-# 选填。共享的平台默认范围；默认三个平台。
-# icon.platforms 省略时继承本项；本项也控制普通启动图命令。
-platforms: [android, ios, ohos]
-
-# 选填映射；省略整个 icon 使用以下各字段默认值。
-# 省略本段并不省略 figma.icon：执行 icon 命令仍必须有设计链接。
-icon:
-  # 选填非空列表；默认继承顶层 platforms（顶层也省略则为三端）。
-  # 可用值只有 android/ios/ohos；重复项合并，[]、null 或未知平台报错。
-  # 不存在对应平台工程时应移除该平台。不会自动创建原生工程。
-  platforms: [android, ios, ohos]
-
-  # 选填字符串，默认 figma_icon，与启动图的 resource_prefix 独立。
-  # 必须小写字母开头，后续仅小写字母、数字、下划线。
-  # 不能与启动图前缀相同；生成后改名会被拒绝，需先迁移旧资源和清单。
-  # 同时作为 iOS .appiconset 名称及 AppIcon 编译设置值。
-  resource_prefix: figma_icon
-
-  # 选填字符串，无默认底色，且不继承启动图 background_color。
-  # 仅接受带引号的 #RRGGBB。
-  # 全彩图标/自适应背景含透明像素时必填，否则生成失败。
-  # 不透明素材可省略。只填补透明区域，不覆盖已有颜色。
-  # 自适应前景和单色轮廓保留透明通道，不使用这个底色合成。
-  background_color: "#FFFFFF"
-
-  # 选填映射；未启用 Android 时，不要求 Android 的分层素材。
-  android:
-    # 选填布尔值，默认 true；"true"、null 等报错。
-    # true：生成 API 26+ 自适应图标，必须有对齐的背景/前景图层。
-    # false：只生成普通多密度图标；API 26+ 也使用普通图标回退。
-    adaptive: true
-    # 选填布尔值，默认 false。
-    # true：要求 adaptive=true 及独立透明轮廓，生成 API 33+ 单色图标。
-    # false/省略：不生成单色图标；从 true 改 false 后 create 会清理工具生成的单色资源。
-    monochrome: false
-
-# 选填映射。以下路径都相对于 --project，不相对于 YAML 所在目录。
-# 必须是工程内的相对路径；拒绝绝对路径、越界和输出符号链接。
-# 各路径独立取默认值，修改资源目录不会自动推导其他路径。
-project:
-  # 选填，默认 android/app/src/main/res；普通与自适应图标的资源根目录。
-  android_res: android/app/src/main/res
-  # 选填，默认 android/app/src/main/AndroidManifest.xml。
-  # Android 启用时必须存在，需有唯一 application。
-  # 修改 application icon/roundIcon；有独立图标的 launcher activity/alias 也一起更新。
-  android_manifest: android/app/src/main/AndroidManifest.xml
-  # 选填，默认 ios/Runner；AppIcon 写入其 Assets.xcassets。
-  # 同级必须有唯一 .xcodeproj；Target 选择和不支持的自动同步 Group 规则同第 6 节。
-  # 自动接入资产目录，并更新该应用所有构建配置的 AppIcon 名称，含已有条件化设置。
-  ios_runner: ios/Runner
-  # 选填，默认 ohos/entry/src/main；必须有 module.json5。
-  # 在指定 Ability 上更新 icon，其他 Ability 和启动窗口配置保持原值。
-  ohos_main: ohos/entry/src/main
-  # 选填，默认 ohos/AppScope；必须有 app.json5 的 app 对象。
-  # 在其 resources/base/media 下生成应用图标，并更新 app.icon。
-  ohos_app_scope: ohos/AppScope
-  # 选填，默认 EntryAbility；必须唯一匹配 module.abilities 内的 name。
-  # 不存在或有多个匹配时报错，不会自动选第一个。
-  ohos_ability: EntryAbility
-```
-<!-- END ICON CONFIG -->
-
-**必填关系：** 图标命令总是要求 `figma.icon`；其对象写法要求 `url`。所有其他图标字段都可省略，但默认启用三端和 Android 自适应图标，因此默认情况下需要三端工程与前景/背景图层。只有 iOS 或鸿蒙时，直接设置 `icon.platforms` 即可，不需要 Android 图层。`nodes` 字段选填不等于相应的设计图层选填。
+**必填关系：** 图标命令总是要求 `icon.figma`；其对象写法要求 `url`。所有其他图标字段都可省略，但默认启用三端和 Android 自适应图标，因此默认情况下需要三端工程与前景/背景图层。只有 iOS 或鸿蒙时，直接设置 `icon.platforms` 即可，不需要 Android 图层。`nodes` 字段选填不等于相应的设计图层选填。
 
 ### Figma 画板与导出规则
 

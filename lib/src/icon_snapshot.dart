@@ -90,7 +90,7 @@ Future<IconSnapshot> fetchIcon(FigmaClient api, IconConfig config) async {
   final root = asMap(asMap(record, 'node')['document'], 'document');
   if (!['FRAME', 'COMPONENT', 'INSTANCE'].contains(root['type']) ||
       root['visible'] == false) {
-    throw SplashException('figma.icon 必须指向可见的 Frame/Component/Instance');
+    throw SplashException('icon.figma 必须指向可见的 Frame/Component/Instance');
   }
   final bounds = DesignRect.fromJson(
     asMap(root['absoluteBoundingBox'], 'icon bounds'),
@@ -125,7 +125,7 @@ Future<IconSnapshot> fetchIcon(FigmaClient api, IconConfig config) async {
         .toList();
     if (matches.length != 1) {
       throw SplashException(
-        'icon/$role 匹配到 ${matches.length} 个可见图层；请使用约定名称或 figma.icon.nodes 映射',
+        'icon/$role 匹配到 ${matches.length} 个可见图层；请使用约定名称或 icon.figma.nodes 映射',
       );
     }
     final layer = matches.single;

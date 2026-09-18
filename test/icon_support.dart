@@ -10,14 +10,13 @@ String iconYaml({
   bool monochrome = false,
   String extra = '',
 }) =>
-    '''figma:
-  icon: https://www.figma.com/design/Example?node-id=1-2
-icon:
+    '''icon:
+  figma: https://www.figma.com/design/Example?node-id=1-2
   platforms: $platforms
   android:
     adaptive: $adaptive
     monochrome: $monochrome
-$extra
+${extra.split('\n').map((line) => '  $line').join('\n')}
 ''';
 
 IconSnapshot iconFixture(IconConfig config) {

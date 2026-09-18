@@ -4,39 +4,46 @@ import 'package:yaml/yaml.dart';
 import 'package:figma_native_splash/figma_native_splash.dart';
 
 void main() {
-  test('README 图标完整配置与独立样例一致，覆盖全部图标选项', () {
+  test('README 合并配置包含完整图标段，与独立样例一致', () {
     final text = File('README.md').readAsStringSync();
     final sample = text
-        .split('<!-- BEGIN ICON CONFIG -->\n```yaml\n')[1]
-        .split('\n```\n<!-- END ICON CONFIG -->')[0];
-    expect(File('example/figma_icon.yaml').readAsStringSync(), '$sample\n');
+        .split('<!-- BEGIN COMPLETE CONFIG -->\n```yaml\n')[1]
+        .split('\n```\n<!-- END COMPLETE CONFIG -->')[0];
+    final document = loadYaml(sample) as YamlMap;
+    expect(document.keys, ['schema_version', 'icon', 'splash']);
+    final section = {
+      'schema_version': document['schema_version'],
+      'icon': document['icon'],
+    };
+    expect(
+      loadYaml(File('example/figma_icon.yaml').readAsStringSync()),
+      section,
+    );
     final c = IconConfig.parse(sample);
     expect(c.platforms, ['android', 'ios', 'ohos']);
     expect(c.prefix, 'figma_icon');
     expect(c.background, '#FFFFFF');
     expect(c.frame.nodes.length, 3);
     final keys = <String>[];
-    void walk(YamlMap map, String prefix) {
+    void walk(Map map, String prefix) {
       for (final entry in map.entries) {
         final key = prefix.isEmpty ? '${entry.key}' : '$prefix.${entry.key}';
         keys.add(key);
-        if (entry.value is YamlMap) walk(entry.value, key);
+        if (entry.value is Map) walk(entry.value, key);
       }
     }
 
-    walk(loadYaml(sample) as YamlMap, '');
+    walk(section, '');
     expect(
       keys,
       unorderedEquals([
         'schema_version',
-        'figma',
-        'figma.icon',
-        'figma.icon.url',
-        'figma.icon.nodes',
-        'figma.icon.nodes.background',
-        'figma.icon.nodes.foreground',
-        'figma.icon.nodes.monochrome',
-        'platforms',
+        'icon.figma',
+        'icon.figma.url',
+        'icon.figma.nodes',
+        'icon.figma.nodes.background',
+        'icon.figma.nodes.foreground',
+        'icon.figma.nodes.monochrome',
         'icon',
         'icon.platforms',
         'icon.resource_prefix',
@@ -44,13 +51,13 @@ void main() {
         'icon.android',
         'icon.android.adaptive',
         'icon.android.monochrome',
-        'project',
-        'project.android_res',
-        'project.android_manifest',
-        'project.ios_runner',
-        'project.ohos_main',
-        'project.ohos_app_scope',
-        'project.ohos_ability',
+        'icon.project',
+        'icon.project.android_res',
+        'icon.project.android_manifest',
+        'icon.project.ios_runner',
+        'icon.project.ohos_main',
+        'icon.project.ohos_app_scope',
+        'icon.project.ohos_ability',
       ]),
     );
   });

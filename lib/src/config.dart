@@ -41,6 +41,49 @@ String configString(
 Map<String, dynamic> configMap(Map<String, dynamic> map, String key) =>
     map.containsKey(key) ? asMap(map[key], key) : <String, dynamic>{};
 
+/// Read the configuration document envelope. Each command parses only its own section;
+/// there are no inherited platform, color, path or source settings.
+Map<String, dynamic> configSection(String text, String section) {
+  final root = asMap(loadYaml(text), '配置');
+  allowedKeys(root, {'schema_version', 'icon', 'splash'}, '配置根节点');
+  if (root.containsKey('schema_version') &&
+      (root['schema_version'] is! int || root['schema_version'] != 1)) {
+    throw SplashException('schema_version 仅支持整数 1，省略时默认 1');
+  }
+  for (final key in ['icon', 'splash']) {
+    if (root.containsKey(key)) asMap(root[key], key);
+  }
+  if (!root.containsKey(section)) {
+    throw SplashException('缺少 $section 配置段，请仅运行已配置功能的命令');
+  }
+  if (root.containsKey('icon') && root.containsKey('splash')) {
+    final icon = asMap(root['icon'], 'icon');
+    final splash = asMap(root['splash'], 'splash');
+    if ((icon['resource_prefix'] ?? 'figma_icon') ==
+        (splash['resource_prefix'] ?? 'figma_splash')) {
+      throw SplashException(
+        'icon.resource_prefix 与 splash.resource_prefix 不能相同',
+      );
+    }
+  }
+  return asMap(root[section], section);
+}
+
+List<String> configPlatforms(Map<String, dynamic> map, String section) {
+  final raw = map.containsKey('platforms')
+      ? map['platforms']
+      : ['android', 'ios', 'ohos'];
+  if (raw is! List ||
+      raw.isEmpty ||
+      raw.any(
+        (value) =>
+            value is! String || !['android', 'ios', 'ohos'].contains(value),
+      )) {
+    throw SplashException('$section.platforms 必须是非空的平台列表（android/ios/ohos）');
+  }
+  return raw.cast<String>().toSet().toList();
+}
+
 String safeRelative(String value) {
   final normalized = p.normalize(value);
   if (p.isAbsolute(value) ||
@@ -134,48 +177,30 @@ class SplashConfig {
     if (!file.existsSync()) throw SplashException('未找到配置：${file.path}');
     return SplashConfig.parse(file.readAsStringSync());
   }
-  factory SplashConfig.parse(String text, {bool requirePhone = true}) {
-    final map = asMap(loadYaml(text), '配置');
+  factory SplashConfig.parse(String text) {
+    final map = configSection(text, 'splash');
     allowedKeys(map, {
-      'schema_version',
       'figma',
       'platforms',
       'resource_prefix',
       'background_color',
       'project',
       'ohos',
-      'icon',
-    }, '配置');
-    if (map.containsKey('schema_version') &&
-        (map['schema_version'] is! int || map['schema_version'] != 1)) {
-      throw SplashException('不支持的 schema_version');
-    }
-    final figma = asMap(map['figma'], 'figma');
-    allowedKeys(figma, {'phone', 'tablet', 'icon'}, 'figma');
-    if (requirePhone && !figma.containsKey('phone')) {
-      throw SplashException('生成启动图必须提供 figma.phone；仅生成图标请使用 icon 命令');
+    }, 'splash');
+    final figma = asMap(map['figma'], 'splash.figma');
+    allowedKeys(figma, {'phone', 'tablet'}, 'splash.figma');
+    if (!figma.containsKey('phone')) {
+      throw SplashException('生成启动图必须提供 splash.figma.phone');
     }
     final frames = {
-      for (final entry in figma.entries.where((entry) => entry.key != 'icon'))
+      for (final entry in figma.entries)
         entry.key: FrameConfig.parse(entry.value),
     };
-    final rawPlatforms = map.containsKey('platforms')
-        ? map['platforms']
-        : ['android', 'ios', 'ohos'];
-    if (rawPlatforms is! List || rawPlatforms.isEmpty) {
-      throw SplashException('platforms 必须为非空列表');
-    }
-    final platforms = rawPlatforms
-        .map((value) => value.toString())
-        .toSet()
-        .toList();
-    if (platforms.any((value) => !['android', 'ios', 'ohos'].contains(value))) {
-      throw SplashException('未知平台');
-    }
+    final platforms = configPlatforms(map, 'splash');
     final prefix = configString(
       map,
       'resource_prefix',
-      'resource_prefix',
+      'splash.resource_prefix',
       fallback: 'figma_splash',
     );
     if (!RegExp(r'^[a-z][a-z0-9_]*$').hasMatch(prefix)) {
@@ -184,19 +209,19 @@ class SplashConfig {
     final color = configString(
       map,
       'background_color',
-      'background_color',
+      'splash.background_color',
       fallback: '#FFFFFF',
     );
     if (!RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(color)) {
       throw SplashException('background_color 必须为带引号的 #RRGGBB');
     }
     final ohos = configMap(map, 'ohos');
-    allowedKeys(ohos, {'app_splash'}, 'ohos');
+    allowedKeys(ohos, {'app_splash'}, 'splash.ohos');
     final appSplash = ohos.containsKey('app_splash')
         ? ohos['app_splash']
         : false;
     if (appSplash is! bool) {
-      throw SplashException('ohos.app_splash 必须为 true 或 false');
+      throw SplashException('splash.ohos.app_splash 必须为 true 或 false');
     }
     final project = configMap(map, 'project');
     allowedKeys(project, {
@@ -205,9 +230,7 @@ class SplashConfig {
       'ohos_main',
       'ohos_page',
       'ohos_ability',
-      'android_manifest',
-      'ohos_app_scope',
-    }, 'project');
+    }, 'splash.project');
     final defaults = {
       'android_res': 'android/app/src/main/res',
       'ios_runner': 'ios/Runner',
@@ -220,7 +243,7 @@ class SplashConfig {
           configString(
             project,
             entry.key,
-            'project.${entry.key}',
+            'splash.project.${entry.key}',
             fallback: entry.value,
           ),
         ),
@@ -234,7 +257,7 @@ class SplashConfig {
       configString(
         project,
         'ohos_ability',
-        'project.ohos_ability',
+        'splash.project.ohos_ability',
         fallback: 'EntryAbility',
       ),
       ohosAppSplash: appSplash,

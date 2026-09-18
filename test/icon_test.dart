@@ -20,24 +20,22 @@ void main() {
   });
   test('仅图标不要求 phone，默认值独立且兼容共享 YAML', () {
     final minimal = IconConfig.parse(
-      'figma:\n  icon: https://figma.com/design/Example?node-id=1-2',
+      'icon:\n  figma: https://figma.com/design/Example?node-id=1-2',
     );
     expect(minimal.platforms, ['android', 'ios', 'ohos']);
     expect(minimal.prefix, 'figma_icon');
     expect(minimal.background, isNull);
     expect(minimal.adaptive, isTrue);
     expect(minimal.monochrome, isFalse);
-    expect(minimal.shared.frames, isEmpty);
+    expect(minimal.paths['ios_runner'], 'ios/Runner');
     expect(minimal.androidManifest, 'android/app/src/main/AndroidManifest.xml');
     expect(minimal.ohosAppScope, 'ohos/AppScope');
-    expect(
-      () => IconConfig.parse('figma: {}'),
-      throwsA(isA<SplashException>()),
-    );
-    final shared = '''figma:
-  phone: https://figma.com/design/Example?node-id=1-2
-  icon: https://figma.com/design/Example?node-id=1-3
+    expect(() => IconConfig.parse('icon: {}'), throwsA(isA<SplashException>()));
+    final shared = '''splash:
+  figma:
+    phone: https://figma.com/design/Example?node-id=1-2
 icon:
+  figma: https://figma.com/design/Example?node-id=1-3
   platforms: [ios]
 ''';
     expect(SplashConfig.parse(shared).frames.keys, ['phone']);
@@ -50,7 +48,6 @@ icon:
       'platforms: null',
       'background_color: null',
       'background_color: "#FFF"',
-      'resource_prefix: figma_splash',
       'resource_prefix: App.Icon',
       'android: {adaptive: false, monochrome: true}',
       'android: {adaptive: "true"}',
@@ -59,7 +56,7 @@ icon:
     ]) {
       expect(
         () => IconConfig.parse(
-          'figma:\n  icon: https://figma.com/design/Example?node-id=1-2\nicon:\n  $content',
+          'icon:\n  figma: https://figma.com/design/Example?node-id=1-2\n  $content',
         ),
         throwsA(isA<SplashException>()),
         reason: content,
@@ -67,12 +64,14 @@ icon:
     }
     expect(
       () => IconConfig.parse(
-        '${iconYaml()}project:\n  ohos_app_scope: ../outside',
+        '${iconYaml()}  project:\n    ohos_app_scope: ../outside',
       ),
       throwsA(isA<SplashException>()),
     );
     expect(
-      () => IconConfig.parse('${iconYaml()}project:\n  android_manifest: null'),
+      () => IconConfig.parse(
+        '${iconYaml()}  project:\n    android_manifest: null',
+      ),
       throwsA(isA<SplashException>()),
     );
   });

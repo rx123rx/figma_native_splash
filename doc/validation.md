@@ -43,7 +43,7 @@ The output directory must not exist. This fixture uses generated artwork only, o
 
 ## App icon validation
 
-- Icon-only and shared configuration, defaults, invalid inputs, documented YAML consistency, snapshot hashes, opaque compositing, adaptive-layer alignment and monochrome alpha masks are tested.
+- Icon-only and combined configuration, defaults, invalid inputs, documented YAML consistency, snapshot hashes, opaque compositing, adaptive-layer alignment and monochrome alpha masks are tested.
 - Mock Figma tests pin a version and verify that asset download requests do not carry credentials. Real icon export still needs an authorized Figma file/token; it has not been validated against a live icon design.
 - Generation tests cover Android application/launcher references, iPhone/iPad AppIcon sizes and all app build configurations, HarmonyOS AppScope and Ability references, comments, unrelated settings, cleanup when adaptive/monochrome are disabled, manual-edit protection, CLI dry-run/check and repeated generation.
 - Generated Android ordinary/adaptive/API 33 monochrome resources compiled and linked with Android SDK 36 (minSdk 21 fixture).
@@ -60,3 +60,8 @@ dart run bin/icon.dart preview --project=/tmp/figma-icon-validation
 ```
 
 The output directory must not exist. The fixture validates generation; native compilation requires a complete platform host and installed SDKs.
+
+## Configuration structure
+
+- Tests cover independent icon/splash defaults and paths, required sections, version/type validation, unknown root fields and prefix collisions. README samples and fixture tools use the same icon/splash structure (schema version 1).
+- Moving existing effective settings into the two sections preserves snapshot source hashes. Offline checks and dry runs in the consuming three-platform app reported no pending resource or integration changes. This configuration change does not repeat native compilation or device visual checks.

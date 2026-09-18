@@ -2,67 +2,81 @@ import 'dart:io';
 import 'package:figma_native_splash/figma_native_splash.dart';
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
+import 'support.dart';
 
 void main() {
   const minimal = '''
 figma:
   phone: https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2
 ''';
-  test('README complete sample matches the standalone example and parses', () {
-    final readme = File('README.md').readAsStringSync();
-    final sample = readme
-        .split('<!-- BEGIN FULL CONFIG -->\n```yaml\n')[1]
-        .split('\n```\n<!-- END FULL CONFIG -->')[0];
-    expect(File('example/figma_splash.yaml').readAsStringSync(), '$sample\n');
-    final config = SplashConfig.parse(sample);
-    expect(config.frames.keys, ['phone', 'tablet']);
-    expect(config.frames['phone']!.nodes.length, 3);
-    expect(config.frames['tablet']!.nodes.length, 3);
-    expect(config.platforms, ['android', 'ios', 'ohos']);
-    expect(config.ohosAppSplash, isFalse);
-    final paths = <String>[];
-    void flatten(YamlMap value, String prefix) {
-      for (final entry in value.entries) {
-        final path = prefix.isEmpty ? '${entry.key}' : '$prefix.${entry.key}';
-        paths.add(path);
-        if (entry.value is YamlMap) flatten(entry.value as YamlMap, path);
+  test(
+    'README combined sample contains the complete splash example and parses',
+    () {
+      final readme = File('README.md').readAsStringSync();
+      final sample = readme
+          .split('<!-- BEGIN COMPLETE CONFIG -->\n```yaml\n')[1]
+          .split('\n```\n<!-- END COMPLETE CONFIG -->')[0];
+      final document = loadYaml(sample) as YamlMap;
+      expect(document.keys, ['schema_version', 'icon', 'splash']);
+      final section = {
+        'schema_version': document['schema_version'],
+        'splash': document['splash'],
+      };
+      expect(
+        loadYaml(File('example/figma_splash.yaml').readAsStringSync()),
+        section,
+      );
+      final config = SplashConfig.parse(sample);
+      expect(config.frames.keys, ['phone', 'tablet']);
+      expect(config.frames['phone']!.nodes.length, 3);
+      expect(config.frames['tablet']!.nodes.length, 3);
+      expect(config.platforms, ['android', 'ios', 'ohos']);
+      expect(config.ohosAppSplash, isFalse);
+      final paths = <String>[];
+      void flatten(Map value, String prefix) {
+        for (final entry in value.entries) {
+          final path = prefix.isEmpty ? '${entry.key}' : '$prefix.${entry.key}';
+          paths.add(path);
+          if (entry.value is Map) flatten(entry.value as Map, path);
+        }
       }
-    }
 
-    flatten(loadYaml(sample) as YamlMap, '');
-    expect(
-      paths,
-      unorderedEquals([
-        'schema_version',
-        'figma',
-        'figma.phone',
-        'figma.phone.url',
-        'figma.phone.nodes',
-        'figma.phone.nodes.background',
-        'figma.phone.nodes.foreground',
-        'figma.phone.nodes.branding',
-        'figma.tablet',
-        'figma.tablet.url',
-        'figma.tablet.nodes',
-        'figma.tablet.nodes.background',
-        'figma.tablet.nodes.foreground',
-        'figma.tablet.nodes.branding',
-        'platforms',
-        'resource_prefix',
-        'background_color',
-        'ohos',
-        'ohos.app_splash',
-        'project',
-        'project.android_res',
-        'project.ios_runner',
-        'project.ohos_main',
-        'project.ohos_page',
-        'project.ohos_ability',
-      ]),
-    );
-  });
+      flatten(section, '');
+      expect(
+        paths,
+        unorderedEquals([
+          'schema_version',
+          'splash',
+          'splash.figma',
+          'splash.figma.phone',
+          'splash.figma.phone.url',
+          'splash.figma.phone.nodes',
+          'splash.figma.phone.nodes.background',
+          'splash.figma.phone.nodes.foreground',
+          'splash.figma.phone.nodes.branding',
+          'splash.figma.tablet',
+          'splash.figma.tablet.url',
+          'splash.figma.tablet.nodes',
+          'splash.figma.tablet.nodes.background',
+          'splash.figma.tablet.nodes.foreground',
+          'splash.figma.tablet.nodes.branding',
+          'splash.platforms',
+          'splash.resource_prefix',
+          'splash.background_color',
+          'splash.ohos',
+          'splash.ohos.app_splash',
+          'splash.project',
+          'splash.project.android_res',
+          'splash.project.ios_runner',
+          'splash.project.ohos_main',
+          'splash.project.ohos_page',
+          'splash.project.ohos_ability',
+        ]),
+      );
+    },
+  );
   test('Omitted optional fields use the documented defaults', () {
-    final config = SplashConfig.parse(minimal);
+    final config = SplashConfig.parse(splashYaml(minimal));
     expect(config.frames.keys, ['phone']);
     expect(config.frames['phone']!.nodes, isEmpty);
     expect(config.platforms, ['android', 'ios', 'ohos']);
@@ -79,9 +93,6 @@ figma:
   });
   test('Explicit null and wrong scalar types never masquerade as defaults', () {
     for (final field in [
-      'schema_version: null',
-      'schema_version: 1.0',
-      'schema_version: "1"',
       'platforms: null',
       'platforms: []',
       'resource_prefix: null',
@@ -96,7 +107,7 @@ figma:
       'project:\n  ios_runner: ""',
     ]) {
       expect(
-        () => SplashConfig.parse('$minimal$field\n'),
+        () => SplashConfig.parse(splashYaml('$minimal$field\n')),
         throwsA(isA<SplashException>()),
         reason: field,
       );
@@ -115,12 +126,13 @@ figma:
       'figma:\n  phone:\n    url: https://figma.com/design/Example?node-id=1-2\n    nodes:\n      background: 123',
     ]) {
       expect(
-        () => SplashConfig.parse(text),
+        () => SplashConfig.parse(splashYaml(text)),
         throwsA(isA<SplashException>()),
         reason: text,
       );
     }
-    final config = SplashConfig.parse('''
+    final config = SplashConfig.parse(
+      splashYaml('''
 figma:
   phone:
     url: https://figma.com/design/Example?node-id=1-2
@@ -128,13 +140,14 @@ figma:
       branding: "10-3"
 ohos: {}
 project: {}
-''');
+'''),
+    );
     expect(config.frames['phone']!.nodes, {'branding': '10:3'});
     expect(config.ohosAppSplash, isFalse);
   });
   test('Changing OHOS module does not silently change the page default', () {
     final config = SplashConfig.parse(
-      '${minimal}project:\n  ohos_main: ohos/custom/src/main\n',
+      splashYaml('${minimal}project:\n  ohos_main: ohos/custom/src/main\n'),
     );
     expect(
       config.paths['ohos_page'],

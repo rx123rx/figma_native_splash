@@ -1,5 +1,7 @@
 ## 0.1.0
 
+- 配置按顶层 icon / splash 分别管理 Figma 来源、平台、颜色与工程路径，配置格式版本为 1。
+
 - Add independent Figma app icon sync/create/check/preview commands, Android adaptive and monochrome resources, iPhone/iPad AppIcon catalogs and HarmonyOS icon integration.
 
 - Fix missing iOS Xcode Resources registration; create now patches project.pbxproj idempotently and check reports incomplete storyboard integration.

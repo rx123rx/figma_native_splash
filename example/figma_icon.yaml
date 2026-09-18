@@ -1,12 +1,11 @@
-# 选填，默认 1；当前只支持整数 1。
+# 选填整数，默认 1；仅支持 1，其他值或 null 报错。
 schema_version: 1
 
-# 必填，映射。
-figma:
-  # 图标命令必填。可用 URL 字符串简写，也可用下方对象写法。
-  # 必须是带 node-id 的 Figma design/file 链接。
-  # 省略：icon 命令报错，不会从 splash 画板里猜测或截取 Logo。
-  icon:
+# 图标命令必填，映射；只使用启动图命令时可省略整个 icon。
+icon:
+  # 必填，可用 URL 字符串简写，或下方 url + nodes 对象。
+  # 必须带 node-id；省略时报错，不会从 splash 截取图标。
+  figma:
     # 对象写法下必填；指向图标的正方形 Frame/Component/Instance。
     url: https://www.figma.com/design/ExampleFileKey/AppIcon?node-id=2-1
     # 选填。省略或 {}：按 icon/background、icon/foreground、icon/monochrome 查找。
@@ -20,19 +19,12 @@ figma:
       # 选填；Android monochrome=true 时对应的单色轮廓图层必需。
       monochrome: "2:4"
 
-# 选填。共享的平台默认范围；默认三个平台。
-# icon.platforms 省略时继承本项；本项也控制普通启动图命令。
-platforms: [android, ios, ohos]
-
-# 选填映射；省略整个 icon 使用以下各字段默认值。
-# 省略本段并不省略 figma.icon：执行 icon 命令仍必须有设计链接。
-icon:
-  # 选填非空列表；默认继承顶层 platforms（顶层也省略则为三端）。
+  # 选填非空列表；默认 [android, ios, ohos]；不继承 splash.platforms。
   # 可用值只有 android/ios/ohos；重复项合并，[]、null 或未知平台报错。
   # 不存在对应平台工程时应移除该平台。不会自动创建原生工程。
   platforms: [android, ios, ohos]
 
-  # 选填字符串，默认 figma_icon，与启动图的 resource_prefix 独立。
+  # 选填字符串，默认 figma_icon，与 splash.resource_prefix 独立。
   # 必须小写字母开头，后续仅小写字母、数字、下划线。
   # 不能与启动图前缀相同；生成后改名会被拒绝，需先迁移旧资源和清单。
   # 同时作为 iOS .appiconset 名称及 AppIcon 编译设置值。
@@ -56,26 +48,27 @@ icon:
     # false/省略：不生成单色图标；从 true 改 false 后 create 会清理工具生成的单色资源。
     monochrome: false
 
-# 选填映射。以下路径都相对于 --project，不相对于 YAML 所在目录。
-# 必须是工程内的相对路径；拒绝绝对路径、越界和输出符号链接。
-# 各路径独立取默认值，修改资源目录不会自动推导其他路径。
-project:
-  # 选填，默认 android/app/src/main/res；普通与自适应图标的资源根目录。
-  android_res: android/app/src/main/res
-  # 选填，默认 android/app/src/main/AndroidManifest.xml。
-  # Android 启用时必须存在，需有唯一 application。
-  # 修改 application icon/roundIcon；有独立图标的 launcher activity/alias 也一起更新。
-  android_manifest: android/app/src/main/AndroidManifest.xml
-  # 选填，默认 ios/Runner；AppIcon 写入其 Assets.xcassets。
-  # 同级必须有唯一 .xcodeproj；Target 选择和不支持的自动同步 Group 规则同第 6 节。
-  # 自动接入资产目录，并更新该应用所有构建配置的 AppIcon 名称，含已有条件化设置。
-  ios_runner: ios/Runner
-  # 选填，默认 ohos/entry/src/main；必须有 module.json5。
-  # 在指定 Ability 上更新 icon，其他 Ability 和启动窗口配置保持原值。
-  ohos_main: ohos/entry/src/main
-  # 选填，默认 ohos/AppScope；必须有 app.json5 的 app 对象。
-  # 在其 resources/base/media 下生成应用图标，并更新 app.icon。
-  ohos_app_scope: ohos/AppScope
-  # 选填，默认 EntryAbility；必须唯一匹配 module.abilities 内的 name。
-  # 不存在或有多个匹配时报错，不会自动选第一个。
-  ohos_ability: EntryAbility
+
+  # 选填映射。以下路径都相对于 --project，不相对于 YAML 所在目录。
+  # 必须是工程内的相对路径；拒绝绝对路径、越界和输出符号链接。
+  # 各路径独立取默认值，修改资源目录不会自动推导其他路径。
+  project:
+    # 选填，默认 android/app/src/main/res；普通与自适应图标的资源根目录。
+    android_res: android/app/src/main/res
+    # 选填，默认 android/app/src/main/AndroidManifest.xml。
+    # Android 启用时必须存在，需有唯一 application。
+    # 修改 application icon/roundIcon；有独立图标的 launcher activity/alias 也一起更新。
+    android_manifest: android/app/src/main/AndroidManifest.xml
+    # 选填，默认 ios/Runner；AppIcon 写入其 Assets.xcassets。
+    # 同级必须有唯一 .xcodeproj；Target 选择和不支持的自动同步 Group 规则同第 6 节。
+    # 自动接入资产目录，并更新该应用所有构建配置的 AppIcon 名称，含已有条件化设置。
+    ios_runner: ios/Runner
+    # 选填，默认 ohos/entry/src/main；必须有 module.json5。
+    # 在指定 Ability 上更新 icon，其他 Ability 和启动窗口配置保持原值。
+    ohos_main: ohos/entry/src/main
+    # 选填，默认 ohos/AppScope；必须有 app.json5 的 app 对象。
+    # 在其 resources/base/media 下生成应用图标，并更新 app.icon。
+    ohos_app_scope: ohos/AppScope
+    # 选填，默认 EntryAbility；必须唯一匹配 module.abilities 内的 name。
+    # 不存在或有多个匹配时报错，不会自动选第一个。
+    ohos_ability: EntryAbility

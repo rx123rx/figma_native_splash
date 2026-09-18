@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
-import 'package:yaml/yaml.dart';
 import 'config.dart';
 
 /// Icon-only settings. Splash commands never generate desktop icons.
 class IconConfig {
-  final SplashConfig shared;
+  final Map<String, String> paths;
+  final String ability;
   final FrameConfig frame;
   final List<String> platforms;
   final String prefix;
@@ -14,7 +14,8 @@ class IconConfig {
   final bool adaptive, monochrome;
   final String androidManifest, ohosAppScope;
   IconConfig._(
-    this.shared,
+    this.paths,
+    this.ability,
     this.frame,
     this.platforms,
     this.prefix,
@@ -30,33 +31,21 @@ class IconConfig {
     return IconConfig.parse(file.readAsStringSync());
   }
   factory IconConfig.parse(String text) {
-    final shared = SplashConfig.parse(text, requirePhone: false);
-    final root = asMap(loadYaml(text), '配置');
-    final figma = asMap(root['figma'], 'figma');
-    if (!figma.containsKey('icon')) {
-      throw SplashException('生成图标必须提供 figma.icon');
-    }
-    final frame = FrameConfig.parse(
-      figma['icon'],
-      roles: {'background', 'foreground', 'monochrome'},
-    );
-    final map = configMap(root, 'icon');
+    final map = configSection(text, 'icon');
     allowedKeys(map, {
+      'figma',
       'platforms',
       'resource_prefix',
       'background_color',
       'android',
+      'project',
     }, 'icon');
-    final raw = map.containsKey('platforms')
-        ? map['platforms']
-        : shared.platforms;
-    if (raw is! List ||
-        raw.isEmpty ||
-        raw.any(
-          (v) => v is! String || !['android', 'ios', 'ohos'].contains(v),
-        )) {
-      throw SplashException('icon.platforms 必须是非空的平台列表（android/ios/ohos）');
-    }
+    if (!map.containsKey('figma')) throw SplashException('生成图标必须提供 icon.figma');
+    final frame = FrameConfig.parse(
+      map['figma'],
+      roles: {'background', 'foreground', 'monochrome'},
+    );
+    final platforms = configPlatforms(map, 'icon');
     final prefix = configString(
       map,
       'resource_prefix',
@@ -65,9 +54,6 @@ class IconConfig {
     );
     if (!RegExp(r'^[a-z][a-z0-9_]*$').hasMatch(prefix)) {
       throw SplashException('icon.resource_prefix 只允许小写字母开头及小写字母、数字、下划线');
-    }
-    if (prefix == shared.prefix) {
-      throw SplashException('图标与启动图不能使用相同 resource_prefix');
     }
     final background = map.containsKey('background_color')
         ? configString(map, 'background_color', 'icon.background_color')
@@ -91,11 +77,41 @@ class IconConfig {
     if (monochrome && !adaptive) {
       throw SplashException('monochrome: true 要求 adaptive: true');
     }
-    final project = configMap(root, 'project');
+    final project = configMap(map, 'project');
+    allowedKeys(project, {
+      'android_res',
+      'android_manifest',
+      'ios_runner',
+      'ohos_main',
+      'ohos_app_scope',
+      'ohos_ability',
+    }, 'icon.project');
+    final defaults = {
+      'android_res': 'android/app/src/main/res',
+      'ios_runner': 'ios/Runner',
+      'ohos_main': 'ohos/entry/src/main',
+    };
+    final paths = {
+      for (final entry in defaults.entries)
+        entry.key: safeRelative(
+          configString(
+            project,
+            entry.key,
+            'icon.project.${entry.key}',
+            fallback: entry.value,
+          ),
+        ),
+    };
     return IconConfig._(
-      shared,
+      paths,
+      configString(
+        project,
+        'ohos_ability',
+        'icon.project.ohos_ability',
+        fallback: 'EntryAbility',
+      ),
       frame,
-      raw.cast<String>().toSet().toList(),
+      platforms,
       prefix,
       background,
       adaptive,
@@ -104,7 +120,7 @@ class IconConfig {
         configString(
           project,
           'android_manifest',
-          'project.android_manifest',
+          'icon.project.android_manifest',
           fallback: 'android/app/src/main/AndroidManifest.xml',
         ),
       ),
@@ -112,7 +128,7 @@ class IconConfig {
         configString(
           project,
           'ohos_app_scope',
-          'project.ohos_app_scope',
+          'icon.project.ohos_app_scope',
           fallback: 'ohos/AppScope',
         ),
       ),

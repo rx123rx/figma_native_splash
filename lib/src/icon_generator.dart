@@ -118,7 +118,7 @@ void _android(
   IconSnapshot snapshot,
   img.Image icon,
 ) {
-  final res = c.shared.paths['android_res']!, name = c.prefix;
+  final res = c.paths['android_res']!, name = c.prefix;
   for (final entry in {
     'mdpi': 48,
     'hdpi': 72,
@@ -205,9 +205,9 @@ void _android(
 }
 
 void _ios(OutputPlan plan, IconConfig c, img.Image icon) {
-  final runner = c.shared.paths['ios_runner']!,
+  final runner = c.paths['ios_runner']!,
       folder =
-          '${c.shared.paths['ios_runner']}/Assets.xcassets/${c.prefix}.appiconset';
+          '${c.paths['ios_runner']}/Assets.xcassets/${c.prefix}.appiconset';
   final entries = <Map<String, String>>[];
   final files = <int>{};
   void add(String idiom, num size, int scale) {
@@ -247,9 +247,7 @@ void _ios(OutputPlan plan, IconConfig c, img.Image icon) {
 }
 
 void _ohos(OutputPlan plan, IconConfig c, img.Image icon) {
-  final main = c.shared.paths['ohos_main']!,
-      scope = c.ohosAppScope,
-      name = c.prefix;
+  final main = c.paths['ohos_main']!, scope = c.ohosAppScope, name = c.prefix;
   plan.bytes('$main/resources/base/media/$name.png', sizedIcon(icon, 1024));
   plan.bytes(
     '$scope/resources/base/media/${name}_app.png',
@@ -261,10 +259,10 @@ void _ohos(OutputPlan plan, IconConfig c, img.Image icon) {
   final module = Json5Object.root(plan.read(modulePath)).object('module');
   final abilities = module
       .objects('abilities')
-      .where((a) => a.string('name') == c.shared.ability)
+      .where((a) => a.string('name') == c.ability)
       .toList();
   if (abilities.length != 1) {
-    throw SplashException('找不到唯一鸿蒙 Ability：${c.shared.ability}');
+    throw SplashException('找不到唯一鸿蒙 Ability：${c.ability}');
   }
   plan.text(
     modulePath,

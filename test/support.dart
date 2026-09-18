@@ -3,13 +3,18 @@ import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:figma_native_splash/figma_native_splash.dart';
 
+String splashYaml(String body) =>
+    'splash:\n${body.split('\n').map((line) => '  $line').join('\n')}';
+
 SplashConfig config({String extra = '', bool tablet = true}) =>
-    SplashConfig.parse('''
+    SplashConfig.parse(
+      splashYaml('''
 figma:
   phone: https://www.figma.com/design/Example?node-id=1-2
   ${tablet ? 'tablet: https://www.figma.com/design/Example?node-id=1-3' : ''}
 $extra
-''');
+'''),
+    );
 List<int> png(int width, int height) => img.encodePng(
   img.fill(
     img.Image(width: width, height: height, numChannels: 4),

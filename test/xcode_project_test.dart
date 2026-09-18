@@ -242,9 +242,11 @@ void main() {
     projectFixture(root);
     final c = config(tablet: false, extra: 'platforms: [ios]');
     saveSnapshot(root, fixture(c));
-    write(root, 'figma_splash.yaml', '''figma:
-  phone: https://www.figma.com/design/Example?node-id=1-2
-platforms: [ios]
+    write(root, 'figma_splash.yaml', '''
+splash:
+  figma:
+    phone: https://www.figma.com/design/Example?node-id=1-2
+  platforms: [ios]
 ''');
     await runCli(['--project', root.path], command: 'check');
     expect(exitCode, 2);
