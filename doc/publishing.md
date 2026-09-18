@@ -2,6 +2,8 @@
 
 This package is prepared for pub.dev, but creating the package files or running a dry run does not publish it.
 
+`publish_to: https://pub.dev` in `pubspec.yaml` fixes the upload destination to official pub.dev, including when `PUB_HOSTED_URL` points to a dependency mirror such as `https://pub.flutter-io.cn`. Dependency downloads can continue to use the configured mirror. The final upload prompt should show `https://pub.dev`.
+
 1. Confirm the package name is still available and that the release version is correct.
 2. Confirm the MIT license and copyright attribution with the rights holder. The initial attribution is `figma_native_splash contributors`.
 3. Set `repository` in `pubspec.yaml` to the real public source repository once available. Optionally add real `homepage`, `issue_tracker` and `documentation` URLs. Do not use placeholder URLs.

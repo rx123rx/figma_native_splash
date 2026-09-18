@@ -2,6 +2,7 @@ name: figma_native_splash
 description: Generate native splash screens and app icons for Android, iOS, and HarmonyOS from Figma designs, with snapshots and offline generation.
 version: 0.1.0
 repository: https://github.com/rx123rx/figma_native_splash
+publish_to: https://pub.dev
 environment:
   sdk: '>=3.8.0 <4.0.0'
 dependencies:
