@@ -2,11 +2,55 @@
 
 从 **Figma 设计链接**生成 Android、iOS、鸿蒙原生启动图和桌面 App 图标。支持手机/平板适配、构图预览和离线生成。
 
-> **同步凭据：** 可在配置文件最前面的 `figma_access_token` 填写 Figma Personal Access Token，也可设置环境变量 `FIGMA_ACCESS_TOKEN`（非空时优先）。仅 `sync` 和 `icon sync` 需要凭据；两处都未提供时会在联网前报错。Token 需要 `file_content:read` 权限，且所属账号有权访问目标文件。填写真实 Token 的配置不要提交到 Git 或分享；团队共享配置建议留空，通过环境变量提供凭据。离线 `create` / `check` / `preview` 无需 Token。
+English: [README_EN.md](README_EN.md)
 
+> **同步凭据：** 可在配置文件最前面的 `figma_access_token` 填写 Figma Personal Access Token，也可设置环境变量 `FIGMA_ACCESS_TOKEN`（非空时优先）。仅 `sync` 和 `icon sync` 需要凭据；两处都未提供时会在联网前报错。Token 需要 `file_content:read` 权限，且所属账号有权访问目标文件。填写真实 Token 的配置不要提交到 Git 或分享；团队共享配置建议留空，通过环境变量提供凭据。离线 `create` / `check` / `preview` 无需 Token。
+>
 > 示例中的 `ExampleFileKey`、节点 ID 为占位值，请替换成有访问权限的真实 Figma 画板。
 
-## 1. 安装与使用条件
+## 这个工具做什么
+
+| 能力 | 说明 |
+|---|---|
+| 原生启动图 | 从 Figma 画板按「背景 + 主视觉 + 底部品牌」三层导出素材，写入 Android、iOS、鸿蒙工程，并完成 Xcode 引用、`Info.plist`、`module.json5` 等原生接入 |
+| 桌面 App 图标 | 同一份 YAML 的 `icon` 段生成三端图标，含 Android 自适应图标与 API 33+ 单色图标 |
+| 可离线复现 | `sync` 会把设计版本、节点位置和素材哈希存成快照，之后 `create` / `check` / `preview` 不需要网络 |
+| 改动可控 | `create --dry-run` 先列出将要改动的清单；遇到内容不同的同名资源或人工改动过的工具文件一律报错，不静默覆盖 |
+
+它不会：修改 Figma 设计稿、猜测素材语义、替你决定视觉；也不负责创建 Flutter 工程或缺失的 Android/iOS/鸿蒙平台目录。
+
+## 60 秒看懂使用流程
+
+```text
+figma_splash.yaml ──sync──▶ .figma_splash/ 快照 ──create──▶ android/ ios/ ohos 原生资源
+   只写这一个文件          联网一次，保存素材与版本      之后可离线重复生成并校验
+```
+
+| 步骤 | 命令 | 用途 | 联网 | 写文件 |
+|---|---|---|---|---|
+| 1 | `sync` | 读取 Figma，保存素材与快照，不碰原生工程 | 是 | 仅快照 |
+| 2 | `create --dry-run` | 预览将要写入/删除的文件清单 | 否 | 否 |
+| 3 | `create` | 生成资源并自动接入原生工程 | 否 | 是 |
+| 4 | `check` | 校验接入、快照完整性与文件冲突，适合 CI | 否 | 否 |
+
+命令都写作 `dart run figma_native_splash:<命令>`（例如第 1 步是 `dart run figma_native_splash:sync`）。只做桌面图标时把命令换成 `icon sync` / `icon create` / `icon check` / `icon preview`，见第 5 节。
+
+## 目录
+
+- [1. 安装与前置条件](#1-安装与前置条件)
+- [2. 配置文件结构](#2-配置文件结构)
+- [3. Figma 设计稿要求](#3-figma-设计稿要求)
+- [4. 命令、参数与凭据](#4-命令参数与凭据)
+- [5. 桌面 App 图标](#5-桌面-app-图标)
+- [6. 生成结果与平台差异](#6-生成结果与平台差异)
+- [7. 快照、输出文件与更新](#7-快照输出文件与更新)
+- [8. 常见错误排解](#8-常见错误排解)
+- [9. 开发、验证与发布](#9-开发验证与发布)
+- [附录 A：完整配置参考](#附录-a完整配置参考)
+
+只想尽快跑通：**看完第 1、2 节就够了**。需要确认某个字段的含义时，再来翻附录 A。
+
+## 1. 安装与前置条件
 
 在 Flutter 项目的 `pubspec.yaml` 中添加依赖：
 
@@ -25,51 +69,108 @@ dev_dependencies:
 
 在 Flutter 工程根目录执行 `flutter pub get`。要求 Dart **3.8.0 或以上、低于 4.0.0**；使用 FVM 的项目将下文 `dart` / `flutter` 命令分别替换为 `fvm dart` / `fvm flutter`。
 
-- 同步设计需要网络、Figma Personal Access Token，以及该 Token 所属账号对文件的访问权限。Token 需要 `file_content:read` 权限。
-- 离线生成只需要 Dart、配置、已下载的设计快照和目标原生工程文件。
-- 编译/运行生成结果仍需要对应平台工具链。Android 最低支持 API 24；鸿蒙项目需要已集成提供 `FlutterPage` 的 Flutter OHOS 引擎。
-- 工具不会创建 Flutter 工程，也不会自动添加不存在的 Android/iOS/鸿蒙平台。
+| 场景 | 需要什么 |
+|---|---|
+| 同步设计（`sync`） | 网络、Figma Personal Access Token（`file_content:read` 权限），以及该账号对目标文件的访问权限 |
+| 离线生成（`create` / `check` / `preview`） | 只需 Dart、配置、已保存的快照和目标原生工程文件 |
+| 编译运行生成结果 | 对应平台工具链；Android 最低支持 API 24，鸿蒙项目需要已集成提供 `FlutterPage` 的 Flutter OHOS 引擎 |
 
-## 2. 最小配置与首次运行
+工具不会创建 Flutter 工程，也不会自动添加不存在的 Android/iOS/鸿蒙平台。
 
-配置按功能分成顶层 **`icon`**（桌面图标）和 **`splash`**（启动图）两段。每段自己的 `figma`、`platforms`、`resource_prefix`、`background_color` 和 `project` 独立生效，互不继承。只用其中一种功能时，可以省略另一段。两种功能一起使用时，可直接复制[完整配置示例](#complete-config)，`schema_version` 只写一次。
+## 2. 配置文件结构
+
+所有行为都来自项目根目录的 **`figma_splash.yaml`**。它只有四层：**根节点 → `icon` / `splash` 两个功能段 → 每段的来源 `figma` 与生成范围 `platforms` → 可选的路径与平台开关**。绝大多数项目只需要写链接 + `platforms` 两行。
+
+### 2.1 一眼看清结构
+
+```text
+figma_splash.yaml
+├── figma_access_token: ""          # 选填；非空的环境变量 FIGMA_ACCESS_TOKEN 优先
+├── schema_version: 1               # 选填，固定为 1
+│
+├── icon:                           # 桌面 App 图标，由 icon 命令读取；只做启动图可整段删除
+│   ├── figma: <Figma 画板链接>      # 必填，也可以写成 url + nodes
+│   │                               # 约定图层：icon/background、icon/foreground、icon/monochrome
+│   ├── platforms: [android, ios, ohos]
+│   ├── resource_prefix: figma_icon
+│   ├── background_color: "#FFFFFF" # 素材含透明像素时必填
+│   ├── android: { adaptive: true, monochrome: false }
+│   └── project: { android_res, android_manifest, ios_runner, ohos_main, ohos_app_scope, ohos_ability }
+│
+└── splash:                         # 原生启动图，由 sync/create/check/preview 读取
+    ├── figma:
+    │   ├── phone: <链接 或 url + nodes>          # 必填
+    │   │   └── nodes: { background, foreground, branding }   # 选填，不改图层名时可省
+    │   └── tablet: <同 phone，省略则复用手机稿>    # 选填
+    ├── platforms: [android, ios, ohos]           # 按实际存在的平台写
+    ├── resource_prefix: figma_splash
+    ├── background_color: "#FFFFFF"
+    ├── ohos: { app_splash: false }               # 鸿蒙第二阶段宣传图开关
+    └── project: { android_res, ios_runner, ohos_main, ohos_page, ohos_ability }
+```
+
+### 2.2 `icon` 与 `splash` 互不影响
+
+| | `icon` 段 | `splash` 段 |
+|---|---|---|
+| 负责什么 | 桌面/启动器里的 App 图标 | 冷启动系统窗口显示的启动图 |
+| 用什么命令 | `icon sync` / `icon create` / `icon check` / `icon preview` | `sync` / `create` / `check` / `preview` |
+| 最少要写 | `icon.figma` | `splash.figma.phone` |
+| 根节点共享 | `figma_access_token`、`schema_version` | 同左 |
+| 不共用 | `platforms`、`resource_prefix`、`background_color`、`project` **各自独立生效，互不继承** | 同左 |
+
+两个前缀不能相同；两段都省略时按各自默认值（`figma_icon`、`figma_splash`）处理。
+
+### 2.3 三种常见起手配置
+
+**只做启动图**（最常用；没有鸿蒙目录时务必改 `platforms`）：
 
 ```yaml
-figma_access_token: "" # 选填；可在本地填写，非空环境变量优先
+splash:
+  figma:
+    phone: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2"
+  platforms: [android, ios]
+```
+
+**只做桌面图标**（正方形、无透明区域的画板）：
+
+```yaml
+icon:
+  figma: https://www.figma.com/design/ExampleFileKey/AppIcon?node-id=2-1
+  platforms: [android, ios]
+```
+
+**两者都要**（`schema_version` 只写一次，其余两段并列写）：
+
+```yaml
 schema_version: 1
 icon:
   figma: https://www.figma.com/design/ExampleFileKey/AppIcon?node-id=2-1
   platforms: [android, ios]
-  android:
-    adaptive: false
-splash:
-  figma:
-    phone: https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2
-    tablet: https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-3
-  platforms: [android, ios]
-```
-
-上例图标使用无透明区域的完整正方形画板；启动图仍按三个角色分层。命令保持不变，普通命令读取 `splash`，`icon` 命令读取 `icon`。
-
-在 App 根目录新建 **`figma_splash.yaml`**。如果设计稿使用约定图层名，最少只需要手机链接：
-
-```yaml
-splash:
-  figma:
-    # 必填：指向启动图画板，必须带 node-id。不能只提供整个文件的链接。
-    phone: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2"
-```
-
-上述最小配置默认启用三个平台。**普通 Flutter 项目没有鸿蒙目录时，必须把 `splash.platforms` 改成实际存在的平台**，例如：
-
-```yaml
 splash:
   figma:
     phone: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2"
   platforms: [android, ios]
 ```
 
-在 YAML 最前面的 `figma_access_token` 填写 Token，或在终端 / CI 密钥管理中设置 `FIGMA_ACCESS_TOKEN`。非空环境变量优先；空白值视为未提供。不要将真实凭据提交到 Git。登录 Figma 网页或编辑器不会自动为命令行提供 Token。
+设计稿已按 `splash/background` 等约定命名时，不需要写 `nodes`；旧设计稿不想改图层名时，才用 `nodes` 指定节点 ID。
+
+### 2.4 我该改哪个字段
+
+| 你想做的事 | 改这里 |
+|---|---|
+| 只生成 Android/iOS（没有鸿蒙目录） | `platforms: [android, ios]`（`icon`、`splash` 各写一份） |
+| 加 Pad 稿 | 新增 `splash.figma.tablet`，省略则复用手机稿 |
+| 不想改 Figma 图层名 | `nodes: { background: "10:1", ... }` |
+| 改生成资源的统一前缀 | `resource_prefix`（首次生成后改名会被拒绝，先迁移旧资源） |
+| 原生目录不是标准 Flutter 结构 | `project.*` 各路径，均相对 `--project` |
+| 透明素材出现底色不对 | `background_color`，只接受 `"#RRGGBB"` |
+| 鸿蒙想在 Flutter 首帧前显示宣传图 | `splash.ohos.app_splash: true` |
+| Android 图标没有前景/背景分层稿 | `icon.android.adaptive: false` |
+
+### 2.5 第一次运行
+
+准备好凭据后依次执行：
 
 ```bash
 # 1. 联网读取设计，保存快照、素材和构图预览；不修改原生工程。
@@ -85,15 +186,268 @@ dart run figma_native_splash:create
 dart run figma_native_splash:check
 ```
 
-首次 `sync` 之前执行 `check/create/preview` 会提示缺少快照，**不会自行联网下载**。修改设计后再次主动执行 `sync`，再生成、检查 diff 并运行 App 验收。
+首次 `sync` 之前执行 `check/create/preview` 会提示缺少快照，**不会自行联网下载**。改了 Figma 链接、节点映射或增删 Pad 后要重新 `sync`；只改颜色、平台或鸿蒙开关，直接 `create` 即可。
 
-<a id="complete-config"></a>
+## 3. Figma 设计稿要求
 
-## 3. 完整配置示例：icon + splash
+每个画板应包含以下可见图层，名称区分大小写，角色可以在画板内部嵌套，但必须匹配到唯一节点：
 
-下面是一份完整的 `figma_splash.yaml`，同时包含桌面图标和手机/Pad 启动图的全部配置项，可整段复制。每项都注明必填性、默认值和省略行为。
+```text
+Launch screen (Frame / Component / Instance)
+├── splash/background
+├── splash/foreground
+└── splash/branding
+```
 
-请替换演示链接与节点 ID，并在两段中分别选择实际存在的平台；图层已按约定命名时，删除相应 `nodes` 映射即可。只使用一种功能时可删除另一整段。示例开启 Android 自适应图标，需要图标稿提供对齐的背景和前景图层；只有完整正方形图标稿时将 `icon.android.adaptive` 设为 `false`。
+- **背景**：变换后的绝对边界覆盖完整画板；渐变、光晕等可以放在容器内部。建议使用可拉伸渐变，避免将文字或 Logo 烘焙进背景。
+- **主视觉**：文案、装饰作为一个整体，容器应包含所有有效像素，避免装饰/阴影超出边界后被裁掉。
+- **品牌**：Logo、名称和标语作为一个整体，放在画板底部区域。
+- 原生系统栏由系统绘制；不要把时间、状态栏和 Home 指示条放进三个角色。参考系统栏应在 Figma 中隐藏。
+- 按逻辑尺寸作图，例如手机 375×812、平板 834×1194；不要把 3x 像素尺寸当成逻辑画板尺寸。工具按 3x 导出 PNG，不依赖开发机安装字体。
+- 手机与 Pad 的对应前景图层应使用相同宽高比。iOS 会检查主视觉/品牌的比例差；超过容差会拒绝生成。
+- 角色容器支持旋转和镜像：位置、尺寸使用变换后的绝对边界，PNG 使用 Figma 的导出结果，不再二次旋转或翻转。导出图片比例必须与该边界一致，否则报错；背景仍须覆盖完整画板。
+- 隐藏、重复的角色容器、画板外节点映射、背景边界不符都会报错。显式指定的节点必须是该画板内的可见后代。
+- 只支持 Design 文件（`/design/`、`/file/`），不支持 FigJam、Slides、Make 或分享链接跳转。分支链接会使用分支文件 ID；节点 ID 可使用 `1-2` 或 `1:2`。
+
+更详细的设计约束见 [Figma 模板规范](doc/figma-template.md)。工具只读取 Figma，不重命名图层、不修改设计稿，也不根据图片内容猜测角色。
+
+## 4. 命令、参数与凭据
+
+### 四个启动图命令
+
+| 命令 | 是否联网 | 是否写文件 | 用途 |
+|---|---|---|---|
+| `sync` | 是 | 快照与预览 | 从 Figma 下载素材，固定文件版本，保存节点边界和哈希 |
+| `check` | 否 | 否 | 校验本地快照、工程结构、接入和文件冲突，报告待更新数量 |
+| `create` | 否 | 原生工程与生成清单 | 按配置生成已启用平台；不签名、安装或发布 App |
+| `preview` | 否 | 预览图 | 从已保存的快照重新生成构图示意 |
+
+`check` 通过只表示生成条件满足，不代表已编译或运行通过。`check` 发现普通素材待更新仍可返回成功；iOS Storyboard 未注册到应用 Resources，或 Info.plist 未指向生成的启动图时返回非零退出码，并提示执行 `create`。首次接入请按 `create --dry-run` → `create` → `check` 执行。缺少工程文件、快照损坏或冲突也会失败。
+
+### 命令行参数
+
+| 参数 | 适用命令 | 必填 / 默认值 | 省略或使用时的行为 |
+|---|---|---|---|
+| `--project` | 全部 | 选填，当前工作目录 | 所有项目内路径据此解析；可指定另一个工程的绝对路径 |
+| `--config` | 全部 | 选填，`figma_splash.yaml` | 相对于项目根目录；省略但文件不存在时会报错，不会查找 pubspec.yaml 中的配置 |
+| `--platform` | `create`、`check` | 选填，无 | 省略则处理 YAML 中所有平台；一次仅能指定 `android`、`ios` 或 `ohos`，且必须已在 YAML 启用 |
+| `--dry-run` | `sync`、`create`、`preview` | 选填，默认关闭 | 计算并打印变化但不写文件；`sync` 仍访问网络、需要 Token；对只读的 `check` 没有额外效果 |
+| `--help` / `-h` | 全部 | 选填 | 显示帮助，不读取项目配置或访问网络 |
+
+`sync/preview` 不接受 `--platform`，它们针对完整设计快照。工具不支持 `--all`、平台列表参数或 `--remove`。独立的 App 图标命令见第 5 节。预期配置/网络/文件错误通常以退出码 `2` 结束；退出码 `0` 表示该命令完成。
+
+```bash
+# 仅生成并检查 iOS
+dart run figma_native_splash:create --platform=ios
+dart run figma_native_splash:check --platform=ios
+
+# 配置文件放在项目内 config/ 目录；路径仍以项目根目录为基准
+dart run figma_native_splash:create --config=config/splash.yaml --dry-run
+
+# 指定目标 App 的路径
+dart run figma_native_splash:create --project=/path/to/app
+```
+
+也可全局安装后使用：
+
+```bash
+dart pub global activate figma_native_splash
+figma_native_splash sync --project=/path/to/app
+figma_native_splash create --project=/path/to/app
+```
+
+### Token 配置与环境变量
+
+`sync` 和 `icon sync` 共用一份 Token，按以下顺序选择：
+
+1. 非空的 `FIGMA_ACCESS_TOKEN` 环境变量。
+2. 顶层 `figma_access_token` 配置值。
+3. 两处都未提供：在联网前报错，不写快照。
+
+会去除首尾空白。配置字段可以省略或写 `""`，但不能写 `null`、数字、布尔值；环境变量优先不代表忽略配置类型错误。`create`、`check`、`preview` 不要求有效 Token，也不会联网验证它。认证失败不会自动改用另一份 Token。
+
+过期、缺少权限或无法访问文件通常导致 HTTP 401/403。工具不会交互登录或读取浏览器会话，下载导出图片时不会携带 Figma Token。Token 不写入生成资源、快照或预览，也不参与来源哈希；更换 Token 无需重新生成现有资源。
+
+如果希望共享主配置，可保持其中的 `figma_access_token: ""` 并使用环境变量；也可复制为已加入 `.gitignore` 的本地配置，通过 `--config=figma_splash.local.yaml` 指定，后续生成命令使用同一配置。
+
+HTTP 429 表示限流，错误中会显示服务端提供的 `Retry-After` 信息；工具不会在后台无限重试。同步失败时不会用部分下载结果替换现有快照。
+
+## 5. 桌面 App 图标
+
+图标功能与系统启动窗口的图标是两回事。**普通 `sync/create/check/preview` 命令仅处理启动图**；`icon sync/create/check/preview` 才处理桌面图标。只配置启动图的项目可省略整个 `icon` 段。图标命令不会改启动 Storyboard、Android LaunchTheme、鸿蒙 `startWindowIcon` 或 `startWindowBackground`。
+
+### 最小图标配置
+
+例如仅生成 iPhone/iPad 图标：
+
+```yaml
+icon:
+  figma: https://www.figma.com/design/ExampleFileKey/AppIcon?node-id=2-1
+  platforms: [ios]
+```
+
+这时不需要 `splash.figma.phone`，也不需要图标分层。画板必须是无透明区域的正方形，否则需要明确配置 `icon.background_color`。多平台项目可在同一个 `figma_splash.yaml` 中同时保留 `splash.figma.phone`、`splash.figma.tablet`、`icon.figma` 和两组设置。
+
+### 完整配置与必填关系
+
+图标的全部字段已放在[附录 A 的完整配置示例](#附录-a完整配置参考)中，与 `splash` 一起展示；无需手动拼接两个示例。只需要图标时也可参考 [example/figma_icon.yaml](example/figma_icon.yaml)。
+
+**必填关系：** 图标命令总是要求 `icon.figma`；其对象写法要求 `url`。所有其他图标字段都可省略，但默认启用三端和 Android 自适应图标，因此默认情况下需要三端工程与前景/背景图层。只有 iOS 或鸿蒙时，直接设置 `icon.platforms` 即可，不需要 Android 图层。`nodes` 字段选填不等于相应的设计图层选填。
+
+### Figma 画板与导出规则
+
+- 图标主画板必须正方形，逻辑边长 256～4096，推荐 1024。按固定版本导出到至少 1024×1024 的 PNG；拒绝矩形素材，不拉伸成正方形。
+- 仅生成普通图标时直接使用整个画板导出结果；不要在画板内放可见的参考线、标注或单色辅助层。
+- 启用 Android 自适应图标时，需要 `icon/background` 和 `icon/foreground`。两层外层容器必须与主画板同位置、同尺寸；前景内部保留透明留白。程序保留变换后的坐标对齐，不对角色自动居中或重新裁掉留白。
+- 自适应模式下，所有平台的全彩图标由指定背景和前景合成，避免 `icon/monochrome` 或其他辅助层混入全彩图标。整体画板 PNG 同步保存为参考。
+- Android 的自适应层对应 108×108 dp，重要图形应位于中心直径 66 dp 的安全区域；系统可能裁成圆形、圆角方形等。工具不会根据图像语义自动缩小 Logo，需要通过预览和设备验收检查边缘。
+- `icon/monochrome` 使用透明背景和非透明轮廓。工具将 RGB 统一为白色、保留 alpha，由桌面决定主题颜色；全透明或完全不透明的图层会报错，不能用白底黑图代替透明蒙版。
+- iOS/HarmonyOS 输出使用不透明全彩图，不预先烘焙圆角。当前不支持 iOS 独立深色/着色图标、Liquid Glass 分层图标、Android 多 flavor 分别配置或 HarmonyOS 分层图标。
+
+### 命令与文件
+
+```bash
+# 同步图标，不修改原生工程；Token 可来自环境变量或配置文件。
+fvm dart run figma_native_splash:icon sync
+
+# 离线查看资源和原生接入变化。
+fvm dart run figma_native_splash:icon create --dry-run
+
+# 离线生成，然后检查文件与工程接入是否已经同步。
+fvm dart run figma_native_splash:icon create
+fvm dart run figma_native_splash:icon check
+
+# 从快照重新生成图标构图/裁切预览。
+fvm dart run figma_native_splash:icon preview
+
+# 仅生成已在 icon.platforms 中启用的 iOS。
+fvm dart run figma_native_splash:icon create --platform=ios
+```
+
+未使用 FVM 时把 `fvm dart` 换成 `dart`。全局安装后也可执行 `figma_native_splash icon create`；源码入口是 `dart run bin/icon.dart create`。
+
+| 参数 | 是否必填 / 默认值 | 用途及省略行为 |
+|---|---|---|
+| `--project` | 选填，当前目录 | 所有工程内路径的基准 |
+| `--config` | 选填，`figma_splash.yaml` | 相对于工程根目录；文件不存在会报错 |
+| `--platform` | 选填，无 | 仅适用于 create/check；省略处理全部 icon.platforms，一次只能选一个已启用的平台 |
+| `--dry-run` | 选填，关闭 | sync/create/preview 计算结果但不写入；sync 仍联网并要求 Token；check 本身只读 |
+| `--help` / `-h` | 选填 | 不读配置、不联网，显示帮助 |
+| `FIGMA_ACCESS_TOKEN` | 选填；sync 需要至少一种凭据来源 | 非空时覆盖配置的 figma_access_token；只发给 Figma API，不发给图片下载地址 |
+
+图标 `check` 比启动图的预生成检查更严格：图标素材、清单或原生接入有任何待更新项都返回退出码 `2`，提示先执行 `icon create`；同步且无冲突返回 `0`。错误不自动修复，不会写入工程。
+
+输出与状态：
+
+```text
+.figma_splash/
+├── icon_snapshot/             # 图标来源、版本、SHA-256 与原始 PNG
+├── icon_previews/             # 全彩图标与 Android 裁切示意，非设备截图
+├── generated_icon_android.json
+├── generated_icon_ios.json
+└── generated_icon_ohos.json
+```
+
+- 建议提交配置、图标快照、生成清单和原生资源；将 `.figma_splash/icon_previews/` 加入应用 `.gitignore`。
+- 改图标链接、节点映射，或改变需要下载的 Android 图层时重新 `icon sync`；只改合成底色直接 `icon create`。
+- Android 普通图标生成 48/72/96/144/192 px；自适应图层为 432 px，API 26/33 分别使用资源限定符。
+- iOS 生成 iPhone/iPad 所需图标规格（包括 iPad 167 px）及 1024 px 商店图；自动设置 AppIcon 名称并确保资产目录参与应用 Resources。
+- 鸿蒙在 AppScope 和指定模块各生成 1024 px PNG，分别更新 app.icon 与指定 Ability.icon；不修改包名、版本、权限或签名。
+- 生成文件有冲突或被手改时拒绝覆盖。关闭 adaptive/monochrome 并重新生成后，清理该平台本工具管理的过期资源；从 platforms 删掉整个平台不会自动删除该平台的已有资源。
+- 不自动移除 `flutter_launcher_icons`、旧桌面图标或其他工具配置。迁移应用时，先验证三端实际图标，再移除旧依赖和不再使用的资源。
+
+## 6. 生成结果与平台差异
+
+| 平台 | 原生结果与适配方式 |
+|---|---|
+| iOS | 根据手机/平板尺寸适配分层启动图，自动接入 Xcode 工程 |
+| Android API 24–30 | 分层启动图，按窗口尺寸适配背景、主视觉和底部品牌 |
+| Android API 31+ | 系统纯色背景、居中图形和底部品牌；自动生成 1152×1152 安全图标画布与 800×320 品牌图，实际位置和大小由系统控制 |
+| 鸿蒙 | 默认只更新指定 Ability 的系统启动图标和底色；`app_splash: true` 时额外接入按可用窗口尺寸调整的 ArkUI 分层图 |
+
+iOS 工程需能唯一确定 `.xcodeproj` 和应用 Target。使用 `fileSystemSynchronizedGroups` 的 Target 需先在 Xcode 中转换为普通 Group。
+
+当前模板的边界：
+
+- 只有手机和 Pad 两份设计入口，没有横屏独立稿、任意图层或交互动画配置。横屏使用相同构图并根据可用高度缩小前景。
+- Android 旧版背景铺满窗口；iOS/鸿蒙分层背景等比覆盖裁剪。主视觉和品牌始终保持比例。
+- 深色和浅色使用同一套品牌素材，目前没有独立深色 Figma 链接或暗色覆盖字段。
+- Android 12+ 无法通过系统启动窗口实现完整渐变宣传海报。
+- 鸿蒙宣传图不添加固定展示时长；关闭它不保证系统窗口一直保留到 Dart 首帧。开关只清理本工具的接入，项目自定义 builder 需要自行处理。
+- Figma 静态坐标无法完整表达折叠、分屏和横屏意图，工具用模板规则补足；生成后仍需真机/模拟器验收。
+
+## 7. 快照、输出文件与更新
+
+```text
+figma_splash.yaml
+.figma_splash/
+├── snapshot/
+│   ├── snapshot.json       # 来源节点、Figma 版本、布局和 SHA-256
+│   ├── phone/             # 原始参考图及三个角色 PNG
+│   └── tablet/            # 配置 tablet 时才下载
+├── generated_android.json
+├── generated_ios.json
+├── generated_ohos.json
+└── previews/              # 手机/Pad 横竖屏、小窗口及 Android 12 示意图
+```
+
+建议提交配置、快照、生成清单和原生文件，让构建机器离线生成。预览可加入 `.gitignore`：`.figma_splash/previews/`。这类原生素材不需要再加入 Flutter `assets` 声明，否则可能重复打包。
+
+- 同一个 Figma 文件的多个画板固定到同一文件版本，再按该版本导出图片；手机和 Pad 可以来自不同文件。
+- 改链接、节点映射或增删 Pad 后必须重新 `sync`。只改颜色、平台选择或 `splash.ohos.app_splash` 后直接 `create` 即可。
+- 图片哈希不符时拒绝生成；不要手工替换快照里的 PNG。
+- 重复生成相同内容不产生额外文件差异。
+- 首次遇到同名但不同内容的资源、已生成资源被手动修改，都会报错，不静默覆盖。更改资源前缀/工程目录时应先明确迁移旧接入和资源，工具不是通用重命名器。
+- 工程配置只更新所需启动字段。不会自动删除其他启动图插件、旧资源、签名设置或业务代码。
+
+## 8. 常见错误排解
+
+| 提示 / 现象 | 原因与处理 |
+|---|---|
+| 没有设计快照 | 先在正确项目目录执行 `sync` |
+| 找不到画板或图层 | 检查文件权限、node-id、隐藏图层和映射所在画板 |
+| 匹配到 0 个或多个图层 | 使用精确的 `splash/<角色>` 名称，或指定唯一节点 ID |
+| 背景容器边界不符 | 在 Figma 中用覆盖画板的容器包裹背景，不用孤立的光晕节点当整个背景 |
+| iOS 对应图层比例不同 | 将手机/Pad 的主视觉、品牌按相同比例组织，再同步 |
+| 找不到 LaunchTheme / Info.plist / Ability | 检查 `platforms` 和 `project` 路径，先创建对应原生工程 |
+| 生成文件冲突 | 保留人工改动后恢复工具文件，或在首次接入前选择其他资源前缀 |
+| 关闭鸿蒙宣传图提示剩余引用 | 检查手动改动的导入、builder 引用，避免删除仍被使用的代码 |
+| 预览与设备不完全相同 | 预览是构图示意，不包含真实系统栏、启动动画和各系统约束 |
+
+## 9. 开发、验证与发布
+
+```bash
+dart pub get
+dart format --output=none --set-exit-if-changed lib bin test tool example
+dart analyze
+dart test
+dart pub publish --dry-run
+```
+
+以上检查已封装为发布脚本：
+
+```bash
+# 只检查、不上传；额外核对版本与 CHANGELOG、占位地址、pub.dev 上是否已有同版本。
+dart run tool/publish.dart
+
+# 重跑全部检查后执行 dart pub publish，仍保留 pub 的交互确认。
+dart run tool/publish.dart --publish
+
+# 跳过 pub 的交互确认，仅用于 CI。
+dart run tool/publish.dart --force
+```
+
+pub 只报告警告（例如缺少 `homepage`/`repository`）时脚本不会中止，真正的校验错误或检查失败会停止。上传地址固定为 `https://pub.dev`；本机 `PUB_HOSTED_URL` 指向镜像时，脚本只对上传命令覆盖该变量，依赖下载仍走镜像。
+
+完整配置样例在本文维护；[example/figma_icon.yaml](example/figma_icon.yaml) 和 [example/figma_splash.yaml](example/figma_splash.yaml) 分别提供单功能配置。测试会检查完整示例的两段与独立文件一致，并验证所有字段可以被解析。无需访问 Figma 的代码调用示例见 [example/example.dart](example/example.dart)。
+
+[验证范围](doc/validation.md) · [发布说明](doc/publishing.md) · [MIT License](LICENSE)
+
+本工具与 Figma、Flutter 或平台厂商没有官方隶属关系。
+
+## 附录 A：完整配置参考
+
+这是一份「字段手册」式的 `figma_splash.yaml`，同时包含启动图和桌面图标的全部配置项，可整段复制，每项都注明必填性、默认值和省略行为。首次使用读完第 2 节即可开始；需要确认某个字段时再回来按 Ctrl/Cmd + F 查这里。
 
 <!-- BEGIN COMPLETE CONFIG -->
 ```yaml
@@ -329,229 +683,3 @@ splash:
 **配置项选填不代表对应设计图层可以缺失。** `background`、`foreground`、`branding` 三个角色都必须在设计稿中存在，即使只生成鸿蒙系统启动窗口。`nodes` 只是改变角色的查找方式。
 
 根节点仅接受 `figma_access_token`、`schema_version`、`icon`、`splash`，出现的功能段必须是映射。各命令校验自身配置范围内的未知字段、错误类型和显式 `null`。启动图命令不处理 `icon` 配置，图标命令不要求 `splash.figma.phone`。需要默认值时请删除该字段，不要写空值、`"false"` 或 `null`。`nodes: {}`、`ohos: {}`、`project: {}` 合法，分别表示使用默认查找和默认设置；`platforms: []` 不合法。
-
-## 4. Figma 设计稿要求
-
-每个画板应包含以下可见图层，名称区分大小写，角色可以在画板内部嵌套，但必须匹配到唯一节点：
-
-```text
-Launch screen (Frame / Component / Instance)
-├── splash/background
-├── splash/foreground
-└── splash/branding
-```
-
-- **背景**：变换后的绝对边界覆盖完整画板；渐变、光晕等可以放在容器内部。建议使用可拉伸渐变，避免将文字或 Logo 烘焙进背景。
-- **主视觉**：文案、装饰作为一个整体，容器应包含所有有效像素，避免装饰/阴影超出边界后被裁掉。
-- **品牌**：Logo、名称和标语作为一个整体，放在画板底部区域。
-- 原生系统栏由系统绘制；不要把时间、状态栏和 Home 指示条放进三个角色。参考系统栏应在 Figma 中隐藏。
-- 按逻辑尺寸作图，例如手机 375×812、平板 834×1194；不要把 3x 像素尺寸当成逻辑画板尺寸。工具按 3x 导出 PNG，不依赖开发机安装字体。
-- 手机与 Pad 的对应前景图层应使用相同宽高比。iOS 会检查主视觉/品牌的比例差；超过容差会拒绝生成。
-- 角色容器支持旋转和镜像：位置、尺寸使用变换后的绝对边界，PNG 使用 Figma 的导出结果，不再二次旋转或翻转。导出图片比例必须与该边界一致，否则报错；背景仍须覆盖完整画板。
-- 隐藏、重复的角色容器、画板外节点映射、背景边界不符都会报错。显式指定的节点必须是该画板内的可见后代。
-- 只支持 Design 文件（`/design/`、`/file/`），不支持 FigJam、Slides、Make 或分享链接跳转。分支链接会使用分支文件 ID；节点 ID 可使用 `1-2` 或 `1:2`。
-
-更详细的设计约束见 [Figma 模板规范](doc/figma-template.md)。工具只读取 Figma，不重命名图层、不修改设计稿，也不根据图片内容猜测角色。
-
-## 5. 命令、参数与环境变量
-
-### 四个命令
-
-| 命令 | 是否联网 | 是否写文件 | 用途 |
-|---|---|---|---|
-| `sync` | 是 | 快照与预览 | 从 Figma 下载素材，固定文件版本，保存节点边界和哈希 |
-| `check` | 否 | 否 | 校验本地快照、工程结构、接入和文件冲突，报告待更新数量 |
-| `create` | 否 | 原生工程与生成清单 | 按配置生成已启用平台；不签名、安装或发布 App |
-| `preview` | 否 | 预览图 | 从已保存的快照重新生成构图示意 |
-
-`check` 通过只表示生成条件满足，不代表已编译或运行通过。`check` 发现普通素材待更新仍可返回成功；iOS Storyboard 未注册到应用 Resources，或 Info.plist 未指向生成的启动图时返回非零退出码，并提示执行 `create`。首次接入请按 `create --dry-run` → `create` → `check` 执行。缺少工程文件、快照损坏或冲突也会失败。
-
-### 命令行参数
-
-| 参数 | 适用命令 | 必填 / 默认值 | 省略或使用时的行为 |
-|---|---|---|---|
-| `--project` | 全部 | 选填，当前工作目录 | 所有项目内路径据此解析；可指定另一个工程的绝对路径 |
-| `--config` | 全部 | 选填，`figma_splash.yaml` | 相对于项目根目录；省略但文件不存在时会报错，不会查找 pubspec.yaml 中的配置 |
-| `--platform` | `create`、`check` | 选填，无 | 省略则处理 YAML 中所有平台；一次仅能指定 `android`、`ios` 或 `ohos`，且必须已在 YAML 启用 |
-| `--dry-run` | `sync`、`create`、`preview` | 选填，默认关闭 | 计算并打印变化但不写文件；`sync` 仍访问网络、需要 Token；对只读的 `check` 没有额外效果 |
-| `--help` / `-h` | 全部 | 选填 | 显示帮助，不读取项目配置或访问网络 |
-
-`sync/preview` 不接受 `--platform`，它们针对完整设计快照。工具不支持 `--all`、平台列表参数或 `--remove`。独立的 App 图标命令见第 9 节。预期配置/网络/文件错误通常以退出码 `2` 结束；退出码 `0` 表示该命令完成。
-
-```bash
-# 仅生成并检查 iOS
-dart run figma_native_splash:create --platform=ios
-dart run figma_native_splash:check --platform=ios
-
-# 配置文件放在项目内 config/ 目录；路径仍以项目根目录为基准
-dart run figma_native_splash:create --config=config/splash.yaml --dry-run
-
-# 指定目标 App 的路径
-dart run figma_native_splash:create --project=/path/to/app
-```
-
-也可全局安装后使用：
-
-```bash
-dart pub global activate figma_native_splash
-figma_native_splash sync --project=/path/to/app
-figma_native_splash create --project=/path/to/app
-```
-
-### Token 配置与环境变量
-
-`sync` 和 `icon sync` 共用一份 Token，按以下顺序选择：
-
-1. 非空的 `FIGMA_ACCESS_TOKEN` 环境变量。
-2. 顶层 `figma_access_token` 配置值。
-3. 两处都未提供：在联网前报错，不写快照。
-
-会去除首尾空白。配置字段可以省略或写 `""`，但不能写 `null`、数字、布尔值；环境变量优先不代表忽略配置类型错误。`create`、`check`、`preview` 不要求有效 Token，也不会联网验证它。认证失败不会自动改用另一份 Token。
-
-过期、缺少权限或无法访问文件通常导致 HTTP 401/403。工具不会交互登录或读取浏览器会话，下载导出图片时不会携带 Figma Token。Token 不写入生成资源、快照或预览，也不参与来源哈希；更换 Token 无需重新生成现有资源。
-
-如果希望共享主配置，可保持其中的 `figma_access_token: ""` 并使用环境变量；也可复制为已加入 `.gitignore` 的本地配置，通过 `--config=figma_splash.local.yaml` 指定，后续生成命令使用同一配置。
-
-HTTP 429 表示限流，错误中会显示服务端提供的 `Retry-After` 信息；工具不会在后台无限重试。同步失败时不会用部分下载结果替换现有快照。
-
-## 6. 生成行为与平台差异
-
-| 平台 | 原生结果与适配方式 |
-|---|---|
-| iOS | 根据手机/平板尺寸适配分层启动图，自动接入 Xcode 工程 |
-| Android API 24–30 | 分层启动图，按窗口尺寸适配背景、主视觉和底部品牌 |
-| Android API 31+ | 系统纯色背景、居中图形和底部品牌；自动生成 1152×1152 安全图标画布与 800×320 品牌图，实际位置和大小由系统控制 |
-| 鸿蒙 | 默认只更新指定 Ability 的系统启动图标和底色；`app_splash: true` 时额外接入按可用窗口尺寸调整的 ArkUI 分层图 |
-
-iOS 工程需能唯一确定 `.xcodeproj` 和应用 Target。使用 `fileSystemSynchronizedGroups` 的 Target 需先在 Xcode 中转换为普通 Group。
-
-当前模板的边界：
-
-- 只有手机和 Pad 两份设计入口，没有横屏独立稿、任意图层或交互动画配置。横屏使用相同构图并根据可用高度缩小前景。
-- Android 旧版背景铺满窗口；iOS/鸿蒙分层背景等比覆盖裁剪。主视觉和品牌始终保持比例。
-- 深色和浅色使用同一套品牌素材，目前没有独立深色 Figma 链接或暗色覆盖字段。
-- Android 12+ 无法通过系统启动窗口实现完整渐变宣传海报。
-- 鸿蒙宣传图不添加固定展示时长；关闭它不保证系统窗口一直保留到 Dart 首帧。开关只清理本工具的接入，项目自定义 builder 需要自行处理。
-- Figma 静态坐标无法完整表达折叠、分屏和横屏意图，工具用模板规则补足；生成后仍需真机/模拟器验收。
-
-## 7. 快照、输出文件与更新策略
-
-```text
-figma_splash.yaml
-.figma_splash/
-├── snapshot/
-│   ├── snapshot.json       # 来源节点、Figma 版本、布局和 SHA-256
-│   ├── phone/             # 原始参考图及三个角色 PNG
-│   └── tablet/            # 配置 tablet 时才下载
-├── generated_android.json
-├── generated_ios.json
-├── generated_ohos.json
-└── previews/              # 手机/Pad 横竖屏、小窗口及 Android 12 示意图
-```
-
-建议提交配置、快照、生成清单和原生文件，让构建机器离线生成。预览可加入 `.gitignore`：`.figma_splash/previews/`。这类原生素材不需要再加入 Flutter `assets` 声明，否则可能重复打包。
-
-- 同一个 Figma 文件的多个画板固定到同一文件版本，再按该版本导出图片；手机和 Pad 可以来自不同文件。
-- 改链接、节点映射或增删 Pad 后必须重新 `sync`。只改颜色、平台选择或 `splash.ohos.app_splash` 后直接 `create` 即可。
-- 图片哈希不符时拒绝生成；不要手工替换快照里的 PNG。
-- 重复生成相同内容不产生额外文件差异。
-- 首次遇到同名但不同内容的资源、已生成资源被手动修改，都会报错，不静默覆盖。更改资源前缀/工程目录时应先明确迁移旧接入和资源，工具不是通用重命名器。
-- 工程配置只更新所需启动字段。不会自动删除其他启动图插件、旧资源、签名设置或业务代码。
-
-## 8. 常见错误
-
-| 提示 / 现象 | 原因与处理 |
-|---|---|
-| 没有设计快照 | 先在正确项目目录执行 `sync` |
-| 找不到画板或图层 | 检查文件权限、node-id、隐藏图层和映射所在画板 |
-| 匹配到 0 个或多个图层 | 使用精确的 `splash/<角色>` 名称，或指定唯一节点 ID |
-| 背景容器边界不符 | 在 Figma 中用覆盖画板的容器包裹背景，不用孤立的光晕节点当整个背景 |
-| iOS 对应图层比例不同 | 将手机/Pad 的主视觉、品牌按相同比例组织，再同步 |
-| 找不到 LaunchTheme / Info.plist / Ability | 检查 `platforms` 和 `project` 路径，先创建对应原生工程 |
-| 生成文件冲突 | 保留人工改动后恢复工具文件，或在首次接入前选择其他资源前缀 |
-| 关闭鸿蒙宣传图提示剩余引用 | 检查手动改动的导入、builder 引用，避免删除仍被使用的代码 |
-| 预览与设备不完全相同 | 预览是构图示意，不包含真实系统栏、启动动画和各系统约束 |
-
-## 9. 桌面 App 图标
-
-图标功能与系统启动窗口的图标是两回事。**普通 `sync/create/check/preview` 命令仅处理启动图**；`icon sync/create/check/preview` 才处理桌面图标。只配置启动图的项目可省略整个 `icon` 段。图标命令不会改启动 Storyboard、Android LaunchTheme、鸿蒙 `startWindowIcon` 或 `startWindowBackground`。
-
-### 最小图标配置
-
-例如仅生成 iPhone/iPad 图标：
-
-```yaml
-icon:
-  figma: https://www.figma.com/design/ExampleFileKey/AppIcon?node-id=2-1
-  platforms: [ios]
-```
-
-这时不需要 `splash.figma.phone`，也不需要图标分层。画板必须是无透明区域的正方形，否则需要明确配置 `icon.background_color`。多平台项目可在同一个 `figma_splash.yaml` 中同时保留 `splash.figma.phone`、`splash.figma.tablet`、`icon.figma` 和两组设置。
-
-### 完整配置与必填关系
-
-图标的全部字段已放在第 3 节的[完整配置示例](#complete-config)中，与 `splash` 一起展示；无需手动拼接两个示例。只需要图标时也可参考 [example/figma_icon.yaml](example/figma_icon.yaml)。
-
-**必填关系：** 图标命令总是要求 `icon.figma`；其对象写法要求 `url`。所有其他图标字段都可省略，但默认启用三端和 Android 自适应图标，因此默认情况下需要三端工程与前景/背景图层。只有 iOS 或鸿蒙时，直接设置 `icon.platforms` 即可，不需要 Android 图层。`nodes` 字段选填不等于相应的设计图层选填。
-
-### Figma 画板与导出规则
-
-- 图标主画板必须正方形，逻辑边长 256～4096，推荐 1024。按固定版本导出到至少 1024×1024 的 PNG；拒绝矩形素材，不拉伸成正方形。
-- 仅生成普通图标时直接使用整个画板导出结果；不要在画板内放可见的参考线、标注或单色辅助层。
-- 启用 Android 自适应图标时，需要 `icon/background` 和 `icon/foreground`。两层外层容器必须与主画板同位置、同尺寸；前景内部保留透明留白。程序保留变换后的坐标对齐，不对角色自动居中或重新裁掉留白。
-- 自适应模式下，所有平台的全彩图标由指定背景和前景合成，避免 `icon/monochrome` 或其他辅助层混入全彩图标。整体画板 PNG 同步保存为参考。
-- Android 的自适应层对应 108×108 dp，重要图形应位于中心直径 66 dp 的安全区域；系统可能裁成圆形、圆角方形等。工具不会根据图像语义自动缩小 Logo，需要通过预览和设备验收检查边缘。
-- `icon/monochrome` 使用透明背景和非透明轮廓。工具将 RGB 统一为白色、保留 alpha，由桌面决定主题颜色；全透明或完全不透明的图层会报错，不能用白底黑图代替透明蒙版。
-- iOS/HarmonyOS 输出使用不透明全彩图，不预先烘焙圆角。当前不支持 iOS 独立深色/着色图标、Liquid Glass 分层图标、Android 多 flavor 分别配置或 HarmonyOS 分层图标。
-
-### 命令与文件
-
-```bash
-# 同步图标，不修改原生工程；Token 可来自环境变量或配置文件。
-fvm dart run figma_native_splash:icon sync
-
-# 离线查看资源和原生接入变化。
-fvm dart run figma_native_splash:icon create --dry-run
-
-# 离线生成，然后检查文件与工程接入是否已经同步。
-fvm dart run figma_native_splash:icon create
-fvm dart run figma_native_splash:icon check
-
-# 从快照重新生成图标构图/裁切预览。
-fvm dart run figma_native_splash:icon preview
-
-# 仅生成已在 icon.platforms 中启用的 iOS。
-fvm dart run figma_native_splash:icon create --platform=ios
-```
-
-未使用 FVM 时把 `fvm dart` 换成 `dart`。全局安装后也可执行 `figma_native_splash icon create`；源码入口是 `dart run bin/icon.dart create`。
-
-| 参数 | 是否必填 / 默认值 | 用途及省略行为 |
-|---|---|---|
-| `--project` | 选填，当前目录 | 所有工程内路径的基准 |
-| `--config` | 选填，`figma_splash.yaml` | 相对于工程根目录；文件不存在会报错 |
-| `--platform` | 选填，无 | 仅适用于 create/check；省略处理全部 icon.platforms，一次只能选一个已启用的平台 |
-| `--dry-run` | 选填，关闭 | sync/create/preview 计算结果但不写入；sync 仍联网并要求 Token；check 本身只读 |
-| `--help` / `-h` | 选填 | 不读配置、不联网，显示帮助 |
-| `FIGMA_ACCESS_TOKEN` | 选填；sync 需要至少一种凭据来源 | 非空时覆盖配置的 figma_access_token；只发给 Figma API，不发给图片下载地址 |
-
-图标 `check` 比启动图的预生成检查更严格：图标素材、清单或原生接入有任何待更新项都返回退出码 `2`，提示先执行 `icon create`；同步且无冲突返回 `0`。错误不自动修复，不会写入工程。
-
-输出与状态：
-
-```text
-.figma_splash/
-├── icon_snapshot/             # 图标来源、版本、SHA-256 与原始 PNG
-├── icon_previews/             # 全彩图标与 Android 裁切示意，非设备截图
-├── generated_icon_android.json
-├── generated_icon_ios.json
-└── generated_icon_ohos.json
-```
-
-- 建议提交配置、图标快照、生成清单和原生资源；将 `.figma_splash/icon_previews/` 加入应用 `.gitignore`。
-- 改图标链接、节点映射，或改变需要下载的 Android 图层时重新 `icon sync`；只改合成底色直接 `icon create`。
-- Android 普通图标生成 48/72/96/144/192 px；自适应图层为 432 px，API 26/33 分别使用资源限定符。
-- iOS 生成 iPhone/iPad 所需图标规格（包括 iPad 167 px）及 1024 px 商店图；自动设置 AppIcon 名称并确保资产目录参与应用 Resources。
-- 鸿蒙在 AppScope 和指定模块各生成 1024 px PNG，分别更新 app.icon 与指定 Ability.icon；不修改包名、版本、权限或签名。
-- 生成文件有冲突或被手改时拒绝覆盖。关闭 adaptive/monochrome 并重新生成后，清理该平台本工具管理的过期资源；从 platforms 删掉整个平台不会自动删除该平台的已有资源。
-- 不自动移除 `flutter_launcher_icons`、旧桌面图标或其他工具配置。迁移应用时，先验证三端实际图标，再移除旧依赖和不再使用的资源。
