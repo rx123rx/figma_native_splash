@@ -389,19 +389,19 @@ dart test
 dart pub publish --dry-run
 ```
 
-The same sequence is wrapped by `tool/publish.dart`, which additionally checks the release version against `CHANGELOG.md`, placeholder URLs, `PUB_HOSTED_URL` and whether the version already exists on pub.dev:
+The same sequence is wrapped by `tool/publish.sh`:
 
 ```bash
-dart run tool/publish.dart                # checks only, nothing uploaded
-dart run tool/publish.dart --publish      # re-runs the checks, then dart pub publish
-dart run tool/publish.dart --force        # skips pub's confirmation, CI only
+./tool/publish.sh                    # checks only, nothing uploaded
+./tool/publish.sh --publish          # re-runs the checks, then dart pub publish
+./tool/publish.sh --publish --fvm    # same, using the Dart version managed by fvm
 ```
 
-Pub warnings (for example a missing `homepage`/`repository`) do not stop the script, real validation errors and failed checks do. Uploads always target `https://pub.dev`; a local `PUB_HOSTED_URL` mirror is overridden for the upload command only.
+Any failed check aborts the run before anything is uploaded. Uploads always target `https://pub.dev`; a local `PUB_HOSTED_URL` mirror is overridden for the upload command only, so dependency downloads keep using the mirror. Update the version in `pubspec.yaml` and `CHANGELOG.md` before each release.
 
 The complete configuration sample lives in this README and in the standalone examples: [example/figma_icon.yaml](example/figma_icon.yaml), [example/figma_splash.yaml](example/figma_splash.yaml). Tests keep both in sync and verify that every field parses. See [example/example.dart](example/example.dart) for calling the API without Figma access.
 
-[Validation scope](doc/validation.md) · [Publishing notes](doc/publishing.md) · [MIT License](LICENSE)
+[Validation scope](doc/validation.md) · [Publishing notes](doc/publishing.md) · [Changelog](CHANGELOG_EN.md) · [MIT License](LICENSE)
 
 This tool has no official affiliation with Figma, Flutter or any platform vendor.
 

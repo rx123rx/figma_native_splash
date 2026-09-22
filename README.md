@@ -427,21 +427,21 @@ dart pub publish --dry-run
 以上检查已封装为发布脚本：
 
 ```bash
-# 只检查、不上传；额外核对版本与 CHANGELOG、占位地址、pub.dev 上是否已有同版本。
-dart run tool/publish.dart
+# 只检查、不上传（默认）。
+./tool/publish.sh
 
-# 重跑全部检查后执行 dart pub publish，仍保留 pub 的交互确认。
-dart run tool/publish.dart --publish
+# 重跑全部检查后执行 dart pub publish，保留 pub 的交互确认与授权。
+./tool/publish.sh --publish
 
-# 跳过 pub 的交互确认，仅用于 CI。
-dart run tool/publish.dart --force
+# 使用 fvm 管理的 Dart 版本。
+./tool/publish.sh --publish --fvm
 ```
 
-pub 只报告警告（例如缺少 `homepage`/`repository`）时脚本不会中止，真正的校验错误或检查失败会停止。上传地址固定为 `https://pub.dev`；本机 `PUB_HOSTED_URL` 指向镜像时，脚本只对上传命令覆盖该变量，依赖下载仍走镜像。
+任一检查失败即中止，不会上传。上传地址固定为 `https://pub.dev`；本机 `PUB_HOSTED_URL` 指向镜像时，脚本只对上传命令覆盖该变量，依赖下载仍走镜像。发布前请先更新 `pubspec.yaml` 的版本号与 `CHANGELOG.md`。
 
 完整配置样例在本文维护；[example/figma_icon.yaml](example/figma_icon.yaml) 和 [example/figma_splash.yaml](example/figma_splash.yaml) 分别提供单功能配置。测试会检查完整示例的两段与独立文件一致，并验证所有字段可以被解析。无需访问 Figma 的代码调用示例见 [example/example.dart](example/example.dart)。
 
-[验证范围](doc/validation.md) · [发布说明](doc/publishing.md) · [MIT License](LICENSE)
+[验证范围](doc/validation.md) · [发布说明](doc/publishing.md) · [更新日志](CHANGELOG.md) · [MIT License](LICENSE)
 
 本工具与 Figma、Flutter 或平台厂商没有官方隶属关系。
 
