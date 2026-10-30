@@ -1,6 +1,24 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:image/image.dart' as img;
+import 'config.dart';
 import 'snapshot.dart';
+
+/// 把快照里的原始素材重新编码成规范的 PNG。
+///
+/// 快照保存的是 Figma 导出的原文件，可能带 `pHYs` / `sRGB` / `gAMA` / `tEXt`
+/// 等元数据，也可能使用索引色（`PLTE` + `tRNS`）。直接拼字节写进平台资源时，
+/// 各端产物格式不一致，也容易被资源工具二次改写。按解码后的像素重新编码，
+/// 保证同一图层在 Android、iOS、鸿蒙得到格式一致的 PNG。
+List<int> normalizePng(List<int> bytes) {
+  final image = img.decodePng(Uint8List.fromList(bytes));
+  if (image == null) {
+    throw SplashException('素材不是有效的 PNG，无法写入平台资源');
+  }
+  // encodePng 默认会把解码得到的 textData 写回 tEXt 块，平台资源不需要这些元数据。
+  image.textData = null;
+  return img.encodePng(image);
+}
 
 img.ColorRgb8 color(String value) => img.ColorRgb8(
   int.parse(value.substring(1, 3), radix: 16),

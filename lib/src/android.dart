@@ -4,6 +4,7 @@ import 'config.dart';
 import 'snapshot.dart';
 import 'output.dart';
 import 'artwork.dart';
+import 'xml_format.dart';
 
 void generateAndroid(
   OutputPlan plan,
@@ -16,11 +17,11 @@ void generateAndroid(
   for (final role in ['background', 'foreground', 'branding']) {
     plan.bytes(
       '$res/drawable-nodpi/${prefix}_$role.png',
-      snapshot.assets[phone.layers[role]!.asset]!,
+      normalizePng(snapshot.assets[phone.layers[role]!.asset]!),
     );
     plan.bytes(
       '$res/drawable-w600dp-nodpi/${prefix}_$role.png',
-      snapshot.assets[tablet.layers[role]!.asset]!,
+      normalizePng(snapshot.assets[tablet.layers[role]!.asset]!),
     );
   }
   plan.bytes(
@@ -153,10 +154,6 @@ void generateAndroid(
         ..add(XmlText(entry.value));
       if (existing.isEmpty) theme.children.add(item);
     }
-    plan.text(
-      file,
-      '${document.toXmlString(pretty: true, indent: '    ')}\n',
-      own: false,
-    );
+    plan.text(file, formatXml(document), own: false);
   }
 }

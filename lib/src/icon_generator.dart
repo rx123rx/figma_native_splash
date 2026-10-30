@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:image/image.dart' as img;
 import 'package:xml/xml.dart';
@@ -7,8 +6,10 @@ import 'icon_config.dart';
 import 'icon_snapshot.dart';
 import 'output.dart';
 import 'artwork.dart';
+import 'xcode_asset_catalog.dart';
 import 'xcode_project.dart';
 import 'json5_edit.dart';
+import 'xml_format.dart';
 
 img.Image opaqueIcon(img.Image source, String? background) {
   if (background == null && source.any((pixel) => pixel.aNormalized < 1)) {
@@ -199,7 +200,10 @@ void _android(
   }
   plan.text(
     c.androidManifest,
-    '${document.toXmlString(pretty: true)}\n',
+    // 与 android.dart 生成的 Android 资源、以及 Flutter 工程模板保持一致：
+    // 4 空格缩进、长属性换行、自闭合标签带空格。默认的 2 空格 + 单行属性
+    // 会让每次生成都把整份 manifest 重排。
+    formatXml(document),
     own: false,
   );
 }
@@ -238,9 +242,9 @@ void _ios(OutputPlan plan, IconConfig c, img.Image icon) {
   }
   plan.text(
     '$folder/Contents.json',
-    '${const JsonEncoder.withIndent('  ').convert({
+    '${encodeAssetCatalogContents({
       'images': entries,
-      'info': {'version': 1, 'author': 'figma_native_splash'},
+      'info': {'version': 1, 'author': 'xcode'},
     })}\n',
   );
   integrateIosAppIcon(plan, runner, c.prefix);

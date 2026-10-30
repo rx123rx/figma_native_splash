@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:math' as math;
 import 'package:xml/xml.dart';
 import 'config.dart';
@@ -6,6 +5,7 @@ import 'snapshot.dart';
 import 'output.dart';
 import 'ios_template.dart';
 import 'artwork.dart';
+import 'xcode_asset_catalog.dart';
 import 'xcode_project.dart';
 
 void generateIos(
@@ -41,10 +41,7 @@ void generateIos(
     }
     plan.text(
       '$folder/Contents.json',
-      '${const JsonEncoder.withIndent('  ').convert({
-        'images': entries,
-        'info': {'version': 1, 'author': 'figma_native_splash'},
-      })}\n',
+      '${encodeAssetCatalogContents(imageSetContents(entries))}\n',
     );
   }
   final document = XmlDocument.parse(iosTemplate);
@@ -172,5 +169,10 @@ void generateIos(
       ..clear()
       ..add(XmlText(storyboard));
   }
-  plan.text(plistPath, '${plist.toXmlString(pretty: true)}\n', own: false);
+  plan.text(
+    plistPath,
+    // Xcode 的 Info.plist 使用 Tab 缩进；默认的 2 空格会让整份文件重排。
+    '${plist.toXmlString(pretty: true, indent: '\t')}\n',
+    own: false,
+  );
 }

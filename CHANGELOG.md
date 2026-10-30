@@ -2,6 +2,14 @@
 
 英文版本见 [CHANGELOG_EN.md](CHANGELOG_EN.md)。
 
+## 0.1.2
+
+- Android 与鸿蒙的启动图 PNG 统一重新编码：快照原图可能带 `pHYs` / `sRGB` / `gAMA` / `tEXt` 元数据或是索引色，直接落盘会让各端产物格式不一致；现改为按解码后的像素重新编码并清空 `tEXt`，保证同一图层在两端得到相同字节，像素无损。
+- `AndroidManifest.xml`、Android `styles.xml` 改为按工程风格格式化：4 空格缩进、属性超过 3 个时逐个换行、自闭合标签在 `/` 前保留空格。此前默认的 2 空格 + 单行属性会让每次生成都把整份 manifest 重排。
+- iOS `Info.plist` 改用 Tab 缩进（Xcode 标准），不再被重排成 2 空格。
+- iOS 图片集与图标集的 `Contents.json` 改用 Xcode 的 `"key" : value` 格式，`author` 记为 `xcode`，并只写入带文件的槽位。此前 Xcode 打开工程后补出的空 1x/2x 槽位会显示为 Unassigned 并产生资源警告。
+- 新增 `formatXml`、`encodeAssetCatalogContents`、`imageSetContents`、`normalizePng` 工具函数及对应测试。
+
 ## 0.1.1
 
 - 重构 README：开头给出 `FIGMA_ACCESS_TOKEN` 必读说明，按「安装 → 准备 Figma → 编写配置 → 执行命令 → 平台产物」重写使用流程，并补齐配置文件结构与字段说明。

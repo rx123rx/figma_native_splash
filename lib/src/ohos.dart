@@ -71,7 +71,7 @@ void generateOhos(
       for (final role in ['background', 'foreground', 'branding']) {
         plan.bytes(
           '$main/resources/base/media/${prefix}_${entry.key}_$role.png',
-          snapshot.assets[entry.value.layers[role]!.asset]!,
+          normalizePng(snapshot.assets[entry.value.layers[role]!.asset]!),
         );
       }
     }

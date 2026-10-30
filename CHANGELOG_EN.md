@@ -2,6 +2,14 @@
 
 See [CHANGELOG.md](CHANGELOG.md) for the Chinese version.
 
+## 0.1.2
+
+- Re-encode Android and HarmonyOS splash PNGs from decoded pixels. Snapshot originals may carry `pHYs` / `sRGB` / `gAMA` / `tEXt` metadata or use an indexed palette, which made per-platform output diverge; the same layer now yields identical bytes on both platforms, with no pixel changes.
+- Format `AndroidManifest.xml` and Android `styles.xml` in project style: 4-space indent, one attribute per line when an element has more than three, and a space before `/>`. The previous 2-space, single-line output rewrote the whole manifest on every run.
+- Use tab indentation for the iOS `Info.plist` (Xcode's own style) instead of reflowing it to 2 spaces.
+- Write iOS image set and app icon `Contents.json` in Xcode's `"key" : value` format, record `author` as `xcode`, and include only slots that have a file. Empty 1x/2x slots that Xcode adds on open used to show up as Unassigned with asset warnings.
+- Add `formatXml`, `encodeAssetCatalogContents`, `imageSetContents` and `normalizePng` helpers with tests.
+
 ## 0.1.1
 
 - Restructure the README: document the `FIGMA_ACCESS_TOKEN` requirement at the top and rewrite it around install, Figma preparation, configuration, commands and per-platform output, with the full configuration structure and field reference.
