@@ -1,6 +1,13 @@
 # 更新日志
 
-英文版本见 [CHANGELOG_EN.md](CHANGELOG_EN.md)。
+英文版本见 [CHANGELOG_EN.md](https://github.com/rx123rx/figma_native_splash/blob/main/CHANGELOG_EN.md)。
+
+## 0.1.4
+
+- 新增 Agent Skill：[skills/figma-native-splash/SKILL.md](https://github.com/rx123rx/figma_native_splash/blob/main/skills/figma-native-splash/SKILL.md)。Claude Code、Codex、Cursor 等支持 `SKILL.md` 的 AI 代理安装后，可按 skill 指引完成依赖添加、`figma_splash.yaml` 编写、`sync` / `preview` / `create` / `check` 与图标命令，并覆盖图层命名、Token、iOS 接入以及鸿蒙（OHOS）`startWindowIcon` / `startWindowBackground`、`ohos.app_splash` 宣传图、`ohos/AppScope` 与 Ability 图标等出错时的修复路径。
+- 新增 `skills/figma-native-splash/references/config-reference.md`，汇总配置字段、默认值与省略行为，供 AI 按需加载。
+- 中英文 README 增加「用 AI 自动接入」小节，给出 `npx skills add rx123rx/figma_native_splash` 与手动复制两种安装方式；文档中的仓库内相对链接改为 GitHub 绝对链接，在 pub.dev 上同样可点。
+- 新增 `test/skill_test.dart`，校验 Skill 的 frontmatter、目录名、相对链接以及 README 的安装说明，避免文档失配。
 
 ## 0.1.3
 

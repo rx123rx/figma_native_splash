@@ -2,7 +2,7 @@
 
 从 **Figma 设计链接**生成 Android、iOS、鸿蒙原生启动图和桌面 App 图标。支持手机/平板适配、构图预览和离线生成。
 
-English: [README_EN.md](README_EN.md)
+English: [README_EN.md](https://github.com/rx123rx/figma_native_splash/blob/main/README_EN.md)
 
 > **同步凭据：** 可在配置文件最前面的 `figma_access_token` 填写 Figma Personal Access Token，也可设置环境变量 `FIGMA_ACCESS_TOKEN`（非空时优先）。仅 `sync` 和 `icon sync` 需要凭据；两处都未提供时会在联网前报错。Token 需要 `file_content:read` 权限，且所属账号有权访问目标文件。填写真实 Token 的配置不要提交到 Git 或分享；团队共享配置建议留空，通过环境变量提供凭据。离线 `create` / `check` / `preview` 无需 Token。
 >
@@ -56,7 +56,7 @@ figma_splash.yaml ──sync──▶ .figma_splash/ 快照 ──create──�
 
 ```yaml
 dev_dependencies:
-  figma_native_splash: ^0.1.0
+  figma_native_splash: ^0.1.4
 ```
 
 使用本地源码时，在 App 与本工具目录相邻的情况下可以配置：
@@ -76,6 +76,17 @@ dev_dependencies:
 | 编译运行生成结果 | 对应平台工具链；Android 最低支持 API 24，鸿蒙项目需要已集成提供 `FlutterPage` 的 Flutter OHOS 引擎 |
 
 工具不会创建 Flutter 工程，也不会自动添加不存在的 Android/iOS/鸿蒙平台。
+
+### 1.1 用 AI 自动接入（Agent Skill）
+
+仓库自带 Agent Skill：[skills/figma-native-splash/SKILL.md](https://github.com/rx123rx/figma_native_splash/blob/main/skills/figma-native-splash/SKILL.md)。安装后，Claude Code、Codex、Cursor 等支持 `SKILL.md` 的 AI 会按步骤完成加 dev 依赖、读 Figma 链接、写 `figma_splash.yaml`、执行 `sync` / `preview` / `create` / `check`（以及图标命令），并在图层命名、Token、iOS/鸿蒙接入等出错时给出修复路径。技能覆盖 Android、iOS 与鸿蒙（OHOS）：系统启动窗口的 `startWindowIcon` / `startWindowBackground`、可选的 `ohos.app_splash` 宣传图，以及 `ohos/AppScope` 与 Ability 图标接入。
+
+```bash
+# 安装到当前项目；加 -g 安装到全局。需要 Node.js 22.20+。
+npx skills add rx123rx/figma_native_splash
+```
+
+也可以把 `skills/figma-native-splash/` 手动复制到所用 AI 工具的 skills 目录（例如项目内的 `.claude/skills/figma-native-splash/`）。Skill 只提供操作指引，不会把 Figma Token 写进配置文件；凭据仍由 `FIGMA_ACCESS_TOKEN` 或本地配置提供。
 
 ## 2. 配置文件结构
 
@@ -234,7 +245,7 @@ Launch screen (Frame / Component / Instance)
 - 隐藏、重复的角色容器、背景边界不符都会报错。显式指定的节点默认必须是该画板内的可见后代；需要引用画板外素材时，用 `nodes.<角色>: { id, x, y }` 指定它在画板中的位置（见 2.6）。
 - 只支持 Design 文件（`/design/`、`/file/`），不支持 FigJam、Slides、Make 或分享链接跳转。分支链接会使用分支文件 ID；节点 ID 可使用 `1-2` 或 `1:2`。
 
-更详细的设计约束见 [Figma 模板规范](doc/figma-template.md)。工具只读取 Figma，不重命名图层、不修改设计稿，也不根据图片内容猜测角色。
+更详细的设计约束见 [Figma 模板规范](https://github.com/rx123rx/figma_native_splash/blob/main/doc/figma-template.md)。工具只读取 Figma，不重命名图层、不修改设计稿，也不根据图片内容猜测角色。
 
 ## 4. 命令、参数与凭据
 
@@ -315,7 +326,7 @@ icon:
 
 ### 完整配置与必填关系
 
-图标的全部字段已放在[附录 A 的完整配置示例](#附录-a完整配置参考)中，与 `splash` 一起展示；无需手动拼接两个示例。只需要图标时也可参考 [example/figma_icon.yaml](example/figma_icon.yaml)。
+图标的全部字段已放在[附录 A 的完整配置示例](#附录-a完整配置参考)中，与 `splash` 一起展示；无需手动拼接两个示例。只需要图标时也可参考 [example/figma_icon.yaml](https://github.com/rx123rx/figma_native_splash/blob/main/example/figma_icon.yaml)。
 
 **必填关系：** 图标命令总是要求 `icon.figma`；其对象写法要求 `url`。所有其他图标字段都可省略，但默认启用三端和 Android 自适应图标，因此默认情况下需要三端工程与前景/背景图层。只有 iOS 或鸿蒙时，直接设置 `icon.platforms` 即可，不需要 Android 图层。`nodes` 字段选填不等于相应的设计图层选填。
 
@@ -464,11 +475,11 @@ dart pub publish --dry-run
 ./tool/publish.sh --publish --fvm
 ```
 
-任一检查失败即中止，不会上传。上传地址固定为 `https://pub.dev`；本机 `PUB_HOSTED_URL` 指向镜像时，脚本只对上传命令覆盖该变量，依赖下载仍走镜像。发布前请先更新 `pubspec.yaml` 的版本号与 `CHANGELOG.md`。
+任一检查失败即中止，不会上传。上传地址固定为 `https://pub.dev`；本机 `PUB_HOSTED_URL` 指向镜像时，脚本只对上传命令覆盖该变量，依赖下载仍走镜像。发布前请先更新 `pubspec.yaml` 的版本号与 `CHANGELOG.md`。命令、配置或生成行为变化时，同步更新 `skills/figma-native-splash/` 下的 Skill 文档与中英文 README。
 
-完整配置样例在本文维护；[example/figma_icon.yaml](example/figma_icon.yaml) 和 [example/figma_splash.yaml](example/figma_splash.yaml) 分别提供单功能配置。测试会检查完整示例的两段与独立文件一致，并验证所有字段可以被解析。无需访问 Figma 的代码调用示例见 [example/example.dart](example/example.dart)。
+完整配置样例在本文维护；[example/figma_icon.yaml](https://github.com/rx123rx/figma_native_splash/blob/main/example/figma_icon.yaml) 和 [example/figma_splash.yaml](https://github.com/rx123rx/figma_native_splash/blob/main/example/figma_splash.yaml) 分别提供单功能配置。测试会检查完整示例的两段与独立文件一致，并验证所有字段可以被解析。无需访问 Figma 的代码调用示例见 [example/example.dart](https://github.com/rx123rx/figma_native_splash/blob/main/example/example.dart)。
 
-[验证范围](doc/validation.md) · [发布说明](doc/publishing.md) · [更新日志](CHANGELOG.md) · [MIT License](LICENSE)
+[验证范围](https://github.com/rx123rx/figma_native_splash/blob/main/doc/validation.md) · [发布说明](https://github.com/rx123rx/figma_native_splash/blob/main/doc/publishing.md) · [更新日志](https://github.com/rx123rx/figma_native_splash/blob/main/CHANGELOG.md) · [MIT License](https://github.com/rx123rx/figma_native_splash/blob/main/LICENSE)
 
 本工具与 Figma、Flutter 或平台厂商没有官方隶属关系。
 

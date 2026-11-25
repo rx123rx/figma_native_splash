@@ -2,7 +2,7 @@
 
 Generate native Android, iOS and HarmonyOS splash screens — and desktop app icons — from **Figma design links**, with versioned snapshots, composition previews and offline generation.
 
-中文版: [README.md](README.md)
+中文版: [README.md](https://github.com/rx123rx/figma_native_splash/blob/main/README.md)
 
 > **Credentials:** `sync` and `icon sync` need a Figma Personal Access Token. Put it in the `figma_access_token` field at the top of the config file, or set the `FIGMA_ACCESS_TOKEN` environment variable (a non-empty variable wins). When neither is present the sync commands fail before any network call. See section 4 for details. `ExampleFileKey` and the node IDs below are placeholders — replace them with a board your token can access.
 
@@ -54,7 +54,7 @@ Add the package to your Flutter app's `pubspec.yaml`:
 
 ```yaml
 dev_dependencies:
-  figma_native_splash: ^0.1.0
+  figma_native_splash: ^0.1.4
 ```
 
 When working from local sources next to the app:
@@ -72,6 +72,17 @@ Then run `flutter pub get` in the app root. Requires Dart **3.8.0 or newer, belo
 | Syncing designs (`sync`) | Network, a Figma Personal Access Token with `file_content:read`, and access to the target file |
 | Offline generation (`create` / `check` / `preview`) | Only Dart, the config, the saved snapshot and the native project files |
 | Building the result | The platform toolchains; Android requires min API 24, HarmonyOS requires a Flutter OHOS engine exposing `FlutterPage` |
+
+### 1.1 Let an AI agent integrate it (Agent Skill)
+
+The repository ships an Agent Skill: [skills/figma-native-splash/SKILL.md](https://github.com/rx123rx/figma_native_splash/blob/main/skills/figma-native-splash/SKILL.md). After installing it, Claude Code, Codex, Cursor and other agents that support `SKILL.md` can add the dev dependency, read the Figma link, write `figma_splash.yaml`, run `sync` / `preview` / `create` / `check` (and the icon commands), and follow the error paths for layer naming, tokens and iOS/HarmonyOS wiring. The skill covers Android, iOS and HarmonyOS (OHOS): the native start window `startWindowIcon` / `startWindowBackground`, the optional `ohos.app_splash` promo view, and `ohos/AppScope` plus Ability icon wiring.
+
+```bash
+# Install into the current project; add -g for all projects. Requires Node.js 22.20+.
+npx skills add rx123rx/figma_native_splash
+```
+
+You can also copy `skills/figma-native-splash/` into your agent's skills directory (for example `.claude/skills/figma-native-splash/` inside the project). The skill is guidance only and never writes the Figma token into a config file; credentials still come from `FIGMA_ACCESS_TOKEN` or a local config.
 
 ## 2. Configuration file structure
 
@@ -424,17 +435,17 @@ The same sequence is wrapped by `tool/publish.sh`:
 ./tool/publish.sh --publish --fvm    # same, using the Dart version managed by fvm
 ```
 
-Any failed check aborts the run before anything is uploaded. Uploads always target `https://pub.dev`; a local `PUB_HOSTED_URL` mirror is overridden for the upload command only, so dependency downloads keep using the mirror. Update the version in `pubspec.yaml` and `CHANGELOG.md` before each release.
+Any failed check aborts the run before anything is uploaded. Uploads always target `https://pub.dev`; a local `PUB_HOSTED_URL` mirror is overridden for the upload command only, so dependency downloads keep using the mirror. Update the version in `pubspec.yaml` and `CHANGELOG.md` before each release. When commands, configuration or generated output change, update the Agent Skill under `skills/figma-native-splash/` and both READMEs too.
 
-The complete configuration sample lives in this README and in the standalone examples: [example/figma_icon.yaml](example/figma_icon.yaml), [example/figma_splash.yaml](example/figma_splash.yaml). Tests keep both in sync and verify that every field parses. See [example/example.dart](example/example.dart) for calling the API without Figma access.
+The complete configuration sample lives in this README and in the standalone examples: [example/figma_icon.yaml](https://github.com/rx123rx/figma_native_splash/blob/main/example/figma_icon.yaml), [example/figma_splash.yaml](https://github.com/rx123rx/figma_native_splash/blob/main/example/figma_splash.yaml). Tests keep both in sync and verify that every field parses. See [example/example.dart](https://github.com/rx123rx/figma_native_splash/blob/main/example/example.dart) for calling the API without Figma access.
 
-[Validation scope](doc/validation.md) · [Publishing notes](doc/publishing.md) · [Changelog](CHANGELOG_EN.md) · [MIT License](LICENSE)
+[Validation scope](https://github.com/rx123rx/figma_native_splash/blob/main/doc/validation.md) · [Publishing notes](https://github.com/rx123rx/figma_native_splash/blob/main/doc/publishing.md) · [Changelog](https://github.com/rx123rx/figma_native_splash/blob/main/CHANGELOG_EN.md) · [MIT License](https://github.com/rx123rx/figma_native_splash/blob/main/LICENSE)
 
 This tool has no official affiliation with Figma, Flutter or any platform vendor.
 
 ## Appendix A: full configuration reference
 
-Copy this block as-is and delete the parts you do not need. Every field is annotated with whether it is required, its default and what happens when it is omitted. Also available as [example/figma_splash.yaml](example/figma_splash.yaml) and [example/figma_icon.yaml](example/figma_icon.yaml).
+Copy this block as-is and delete the parts you do not need. Every field is annotated with whether it is required, its default and what happens when it is omitted. Also available as [example/figma_splash.yaml](https://github.com/rx123rx/figma_native_splash/blob/main/example/figma_splash.yaml) and [example/figma_icon.yaml](https://github.com/rx123rx/figma_native_splash/blob/main/example/figma_icon.yaml).
 
 ```yaml
 # Optional. Shared Figma Personal Access Token for `sync` and `icon sync`.

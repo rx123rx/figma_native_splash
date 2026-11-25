@@ -1,6 +1,13 @@
 # Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for the Chinese version.
+See [CHANGELOG.md](https://github.com/rx123rx/figma_native_splash/blob/main/CHANGELOG.md) for the Chinese version.
+
+## 0.1.4
+
+- New Agent Skill: [skills/figma-native-splash/SKILL.md](https://github.com/rx123rx/figma_native_splash/blob/main/skills/figma-native-splash/SKILL.md). After installation, Claude Code, Codex, Cursor and other agents that support `SKILL.md` can add the dependency, write `figma_splash.yaml`, run `sync` / `preview` / `create` / `check` and the icon commands, and follow the error paths for layer naming, tokens, iOS wiring and HarmonyOS (OHOS) `startWindowIcon` / `startWindowBackground`, the optional `ohos.app_splash` promo view, and `ohos/AppScope` / Ability icon wiring.
+- New `skills/figma-native-splash/references/config-reference.md` summarising every configuration field, its default and what happens when it is omitted, loaded on demand by agents.
+- Both READMEs gained an "AI agent skill" subsection with `npx skills add rx123rx/figma_native_splash` and a manual copy option; repo-relative links in the documentation now use absolute GitHub URLs so they also work on pub.dev.
+- New `test/skill_test.dart` validating the skill frontmatter, directory name, relative links and the README install instructions.
 
 ## 0.1.3
 
