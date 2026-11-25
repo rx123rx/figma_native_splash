@@ -120,7 +120,7 @@ figma:
       );
     }
   });
-  test('Phone/url required; node mappings optional and string-only', () {
+  test('Phone/url required; node mappings optional and IDs are normalized', () {
     for (final text in [
       'figma: {}',
       'figma: null',
@@ -149,8 +149,62 @@ ohos: {}
 project: {}
 '''),
     );
-    expect(config.frames['phone']!.nodes, {'branding': '10:3'});
+    final branding = config.frames['phone']!.nodes['branding']!;
+    expect(branding.id, '10:3');
+    expect(branding.hasPosition, isFalse);
     expect(config.ohosAppSplash, isFalse);
+  });
+  test('External role nodes accept an explicit position', () {
+    final config = SplashConfig.parse(
+      splashYaml('''
+figma:
+  phone:
+    url: https://figma.com/design/Example?node-id=1-2
+    nodes:
+      branding:
+        id: "10-3"
+        x: 125
+        y: 704.5
+'''),
+    );
+    final branding = config.frames['phone']!.nodes['branding']!;
+    expect(branding.id, '10:3');
+    expect(branding.hasPosition, isTrue);
+    expect(branding.x, 125);
+    expect(branding.y, 704.5);
+
+    for (final text in [
+      '    nodes:\n      branding:\n        x: 1\n        y: 2',
+      '    nodes:\n      branding:\n        id: "10-3"\n        x: 1',
+      '    nodes:\n      branding:\n        id: "10-3"\n        y: 2',
+      '    nodes:\n      branding:\n        id: "10-3"\n        x: "1"\n        y: 2',
+      '    nodes:\n      branding:\n        id: "10-3"\n        x: 1\n        y: 2\n        z: 3',
+    ]) {
+      expect(
+        () => SplashConfig.parse(
+          splashYaml(
+            'figma:\n  phone:\n    url: https://figma.com/design/Example?node-id=1-2\n$text',
+          ),
+        ),
+        throwsA(isA<SplashException>()),
+        reason: text,
+      );
+    }
+  });
+  test('Icon node mappings only accept string IDs', () {
+    expect(
+      () => IconConfig.parse('''
+icon:
+  figma:
+    url: https://figma.com/design/Example?node-id=1-2
+    nodes:
+      foreground:
+        id: "2:1"
+        x: 1
+        y: 2
+'''),
+      throwsA(isA<SplashException>()),
+    );
   });
   test('Changing OHOS module does not silently change the page default', () {
     final config = SplashConfig.parse(

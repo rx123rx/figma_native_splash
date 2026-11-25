@@ -96,7 +96,7 @@ figma_splash.yaml
 └── splash:                         # native launch screen, read by sync/create/check/preview
     ├── figma:
     │   ├── phone: <link, or url + nodes>               # required
-    │   │   └── nodes: { background, foreground, branding }  # optional
+    │   │   └── nodes: { background, foreground, branding }  # optional; may be id + x/y for off-board artwork
     │   └── tablet: <same shape as phone>              # optional; reuses the phone art when omitted
     ├── platforms: [android, ios, ohos]                # list only the platforms you actually have
     ├── resource_prefix: figma_splash
@@ -158,6 +158,7 @@ When the board already uses the conventional layer names you never need `nodes`.
 | Skip HarmonyOS (no `ohos/` folder) | `platforms: [android, ios]` — write it in each section you use |
 | Add a tablet board | Add `splash.figma.tablet`; omitting it reuses the phone art |
 | Keep existing layer names | `nodes: { background: "10:1", ... }` |
+| Brand lockup lives in an off-board reusable group/component | `nodes.<role>: { id: "10:3", x: 120, y: 700 }` (see 2.6) |
 | Rename generated resources | `resource_prefix` (renaming after the first generation is rejected — migrate first) |
 | Non-standard native folders | `project.*` — all paths are relative to `--project` |
 | Transparent artwork renders with the wrong backdrop | `background_color`, `"#RRGGBB"` only |
@@ -182,6 +183,30 @@ dart run figma_native_splash:check
 
 Running `check` / `create` / `preview` before the first `sync` reports a missing snapshot and **never downloads anything**. Changing links, node mappings or adding a tablet board requires a new `sync`; changing colours, platforms or the HarmonyOS switch only requires `create`.
 
+### 2.6 Referencing off-board artwork (optional)
+
+`nodes` normally points at visible descendants of the board. When a role is a reusable asset kept outside the board (for example a design-system brand lockup made of logo, name and tagline), use the object form and give the asset's top-left position inside the board in design points (board origin is `0,0`):
+
+```yaml
+splash:
+  figma:
+    phone:
+      url: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2"
+      nodes:
+        background: "10:1"
+        foreground: "10:2"
+        branding:
+          id: "30:1"   # off-board brand group; an on-board node also works
+          x: 125       # asset top-left x inside the board
+          y: 704       # asset top-left y inside the board
+```
+
+- Splash only; `icon` node mappings still accept plain node ID strings.
+- `id` is required and `x`/`y` must appear together or not at all. The asset keeps its own size and is never scaled.
+- An off-board node reused by phone and tablet is requested and downloaded once per file.
+- Sharing the **same** off-board asset between phone and tablet makes their aspect ratios identical automatically and satisfies the iOS check more easily. Different assets still must stay within 2%.
+- Off-board nodes must be visible; `background` must still cover the whole board (its `x`/`y` and size are your responsibility).
+
 ## 3. Figma design requirements
 
 Every board must contain the following visible layers. Names are case-sensitive; a role may be nested inside the board but must resolve to exactly one node:
@@ -200,7 +225,7 @@ Launch screen (Frame / Component / Instance)
 - Draw at logical sizes, e.g. 375×812 for phones and 834×1194 for tablets; do not confuse 3x pixel sizes with logical board sizes. Assets are exported at 3x and fonts are not required on the machine.
 - Phone and tablet counterparts must share the same aspect ratio. iOS verifies the ratio of foreground and branding and rejects large differences.
 - Rotated and mirrored containers are supported: positions use transformed absolute bounds while the PNGs come straight from Figma. Exported aspect must match those bounds, and the background must still cover the board.
-- Hidden or duplicated role containers, off-board node mappings and mismatched background bounds are errors. Explicit nodes must be visible descendants of that board.
+- Hidden or duplicated role containers and mismatched background bounds are errors. Explicit nodes must normally be visible descendants of that board; to reference off-board artwork, use `nodes.<role>: { id, x, y }` so its position inside the board is explicit (see 2.6).
 - Only Design files (`/design/`, `/file/`) are supported — not FigJam, Slides, Make or share redirects. Branch links use the branch file key; node IDs accept `1-2` or `1:2`.
 
 The tool only reads Figma. It never renames layers, edits designs or guesses roles from pixels.
@@ -372,6 +397,8 @@ Commit the config, snapshot, manifests and native files so CI can generate offli
 | No design snapshot | Run `sync` in the correct project directory |
 | Board or layer not found | Check file access, `node-id`, hidden layers and whether the mapping belongs to that board |
 | Matched zero or several layers | Use exact `splash/<role>` names, or pin a unique node ID |
+| `... is not inside the board; provide x/y ...` | The role points at off-board artwork; use `nodes.<role>: { id, x, y }`, or point at an on-board node |
+| `... does not exist or is not accessible` / `... is hidden` | Check the off-board node ID, its visibility and account access |
 | Background bounds mismatch | Wrap the background in a container that covers the board; a lone glow is not the background |
 | iOS aspect ratio differs | Organise phone and tablet foreground/branding with the same aspect ratio, then sync again |
 | Missing LaunchTheme / Info.plist / Ability | Check `platforms` and `project` paths; create the native platform first |

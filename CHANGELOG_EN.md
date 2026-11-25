@@ -2,6 +2,13 @@
 
 See [CHANGELOG.md](CHANGELOG.md) for the Chinese version.
 
+## 0.1.3
+
+- Splash roles can now reference **off-board artwork**: `splash.figma.<board>.nodes.<role>` accepts an `{ id, x, y }` object where `x`/`y` place the asset's top-left corner inside the board (design points). This suits reusable design-system layers such as a shared brand lockup; `icon` node mappings still accept plain ID strings only.
+- Off-board artwork shared by phone and tablet is requested and downloaded once per file and written to both role assets.
+- Nodes without an explicit position keep the previous relative-bounds behaviour, so `sourceHash` for existing configs is unchanged and no re-sync is needed for this feature alone.
+- Document the option in both READMEs, the Figma template guide and error messages, with new parsing and sync tests.
+
 ## 0.1.2
 
 - Re-encode Android and HarmonyOS splash PNGs from decoded pixels. Snapshot originals may carry `pHYs` / `sRGB` / `gAMA` / `tEXt` metadata or use an indexed palette, which made per-platform output diverge; the same layer now yields identical bytes on both platforms, with no pixel changes.

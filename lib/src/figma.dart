@@ -41,6 +41,9 @@ class FigmaClient {
     final frames = <String, DesignFrame>{};
     final assets = <String, List<int>>{};
     final sources = <String, dynamic>{};
+    // 同一个文件里，画板外素材可能被手机和平板同时引用：节点数据与图片各取一次。
+    final nodeCache = <String, Map<String, dynamic>?>{};
+    final imageCache = <String, List<int>>{};
     for (final entry in config.frames.entries) {
       final link = entry.value.link;
       final response = await requestJson('files/${link.fileKey}/nodes', {
@@ -68,40 +71,95 @@ class FigmaClient {
       void walk(Map<String, dynamic> node) {
         for (final child in (node['children'] as List? ?? [])) {
           final map = asMap(child, 'child');
-          if (map['visible'] == false) continue;
           descendants.add(map);
           walk(map);
         }
       }
 
       walk(root);
+      final byId = {for (final node in descendants) node['id'] as String: node};
+      final visible = descendants
+          .where((node) => node['visible'] != false)
+          .toList();
+
+      Future<Map<String, dynamic>?> externalNode(String nodeId) async {
+        final key = '${link.fileKey}/$nodeId';
+        if (nodeCache.containsKey(key)) return nodeCache[key];
+        final response = await requestJson('files/${link.fileKey}/nodes', {
+          'ids': nodeId,
+          'version': version,
+        });
+        final nodeRecord = asMap(response['nodes'], 'nodes')[nodeId];
+        final document = nodeRecord == null
+            ? null
+            : asMap(asMap(nodeRecord, 'node')['document'], 'document');
+        nodeCache[key] = document;
+        return document;
+      }
+
       final layers = <String, DesignLayer>{};
       for (final role in ['background', 'foreground', 'branding']) {
-        final mapped = entry.value.nodes[role];
-        final found = descendants
-            .where(
-              (node) => mapped != null
-                  ? node['id'] == mapped
-                  : node['name'] == 'splash/$role',
-            )
-            .toList();
-        if (found.length != 1) {
-          throw SplashException(
-            '${entry.key} 的 $role 匹配到 ${found.length} 个可见图层；请命名为 splash/$role 或在 nodes 中指定该画板内的节点 ID',
+        final roleNode = entry.value.nodes[role];
+        late Map<String, dynamic> node;
+        late DesignRect rect;
+        if (roleNode != null) {
+          final descendant = byId[roleNode.id];
+          if (descendant != null) {
+            if (descendant['visible'] == false) {
+              throw SplashException(
+                '${entry.key} 的 $role 节点 ${roleNode.id} 不可见',
+              );
+            }
+            node = descendant;
+            final r = DesignRect.fromJson(
+              asMap(node['absoluteBoundingBox'], '$role 边界'),
+            );
+            rect = roleNode.hasPosition
+                ? DesignRect(roleNode.x!, roleNode.y!, r.width, r.height)
+                : DesignRect(r.x - bounds.x, r.y - bounds.y, r.width, r.height);
+          } else {
+            if (!roleNode.hasPosition) {
+              throw SplashException(
+                '${entry.key} 的 $role 节点 ${roleNode.id} 不在画板内；'
+                '请改用画板内节点，或在 nodes.$role 中提供 x、y 指定它在画板中的位置',
+              );
+            }
+            final document = await externalNode(roleNode.id);
+            if (document == null) {
+              throw SplashException(
+                '${entry.key} 的 $role 节点 ${roleNode.id} 不存在或无权访问',
+              );
+            }
+            if (document['visible'] == false) {
+              throw SplashException(
+                '${entry.key} 的 $role 节点 ${roleNode.id} 不可见',
+              );
+            }
+            node = document;
+            final r = DesignRect.fromJson(
+              asMap(node['absoluteBoundingBox'], '$role 边界'),
+            );
+            rect = DesignRect(roleNode.x!, roleNode.y!, r.width, r.height);
+          }
+        } else {
+          final found = visible
+              .where((candidate) => candidate['name'] == 'splash/$role')
+              .toList();
+          if (found.length != 1) {
+            throw SplashException(
+              '${entry.key} 的 $role 匹配到 ${found.length} 个可见图层；请命名为 splash/$role 或在 nodes 中指定该画板内的节点 ID',
+            );
+          }
+          node = found.single;
+          final r = DesignRect.fromJson(
+            asMap(node['absoluteBoundingBox'], '$role 边界'),
           );
+          rect = DesignRect(r.x - bounds.x, r.y - bounds.y, r.width, r.height);
         }
-        final node = found.single;
-        // Figma exports the rendered transform into the PNG. Use its
-        // axis-aligned absolute bounds, not the untransformed local size.
-        // A reflection may also report a rotation; do not reject it or
-        // apply the transform again to the downloaded image.
-        final r = DesignRect.fromJson(
-          asMap(node['absoluteBoundingBox'], '$role 边界'),
-        );
         layers[role] = DesignLayer(
           node['id'] as String,
           '${entry.key}/$role.png',
-          DesignRect(r.x - bounds.x, r.y - bounds.y, r.width, r.height),
+          rect,
         );
       }
       final background = layers['background']!.rect;
@@ -111,10 +169,10 @@ class FigmaClient {
           (background.height - bounds.height).abs() > 1) {
         throw SplashException('${entry.key} 的 background 容器必须覆盖完整画板');
       }
-      final exportIds = [
+      final exportIds = <String>{
         link.nodeId,
-        ...layers.values.map((layer) => layer.nodeId),
-      ];
+        for (final layer in layers.values) layer.nodeId,
+      };
       final exports = await requestJson('images/${link.fileKey}', {
         'ids': exportIds.join(','),
         'format': 'png',
@@ -126,29 +184,40 @@ class FigmaClient {
         throw SplashException('Figma 图片导出失败，请检查图层可导出状态');
       }
       final urls = asMap(exports['images'], 'images');
-      final names = {
-        link.nodeId: '${entry.key}/reference.png',
-        for (final layer in layers.values) layer.nodeId: layer.asset,
+      // 一个节点可能同时被手机与平板引用（画板外素材），下载一次后写入各角色的素材路径。
+      final assetPaths = <String, Set<String>>{
+        link.nodeId: {'${entry.key}/reference.png'},
       };
-      for (final image in names.entries) {
-        final uri = Uri.tryParse(urls[image.key]?.toString() ?? '');
-        if (uri == null ||
-            uri.scheme != 'https' ||
-            uri.host.isEmpty ||
-            uri.userInfo.isNotEmpty) {
-          throw SplashException('Figma 未返回有效的图片下载地址');
+      for (final layer in layers.values) {
+        assetPaths.putIfAbsent(layer.nodeId, () => <String>{}).add(layer.asset);
+      }
+      for (final item in assetPaths.entries) {
+        final cacheKey = '${link.fileKey}/${item.key}';
+        var bytes = imageCache[cacheKey];
+        if (bytes == null) {
+          final uri = Uri.tryParse(urls[item.key]?.toString() ?? '');
+          if (uri == null ||
+              uri.scheme != 'https' ||
+              uri.host.isEmpty ||
+              uri.userInfo.isNotEmpty) {
+            throw SplashException('Figma 未返回有效的图片下载地址');
+          }
+          // Download URLs never receive the Figma token.
+          final response = await client
+              .get(uri)
+              .timeout(const Duration(seconds: 90));
+          if (response.statusCode != 200) {
+            throw SplashException('Figma 素材下载失败 HTTP ${response.statusCode}');
+          }
+          if (response.bodyBytes.length > 40 * 1024 * 1024) {
+            throw SplashException('单张素材超过 40 MB，请缩小设计稿');
+          }
+          bytes = response.bodyBytes;
+          imageCache[cacheKey] = bytes;
         }
-        // Download URLs never receive the Figma token.
-        final response = await client
-            .get(uri)
-            .timeout(const Duration(seconds: 90));
-        if (response.statusCode != 200) {
-          throw SplashException('Figma 素材下载失败 HTTP ${response.statusCode}');
+        for (final asset in item.value) {
+          assets[asset] = bytes;
         }
-        if (response.bodyBytes.length > 40 * 1024 * 1024) {
-          throw SplashException('单张素材超过 40 MB，请缩小设计稿');
-        }
-        assets[image.value] = response.bodyBytes;
       }
       frames[entry.key] = DesignFrame(bounds.width, bounds.height, layers);
       sources[entry.key] = {...link.toJson(), 'version': version};

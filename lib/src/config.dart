@@ -161,37 +161,86 @@ class FigmaLink {
   Map<String, dynamic> toJson() => {'fileKey': fileKey, 'nodeId': nodeId};
 }
 
+/// 一个角色引用的节点。默认是其绝对边界落在画板内的图层；
+/// 当它引用画板外的可复用素材（如独立品牌组合）时，用 [x]、[y] 指定
+/// 该素材左上角在画板内的位置（设计点），宽高仍取素材自身尺寸。
+class RoleNode {
+  final String id;
+  final double? x, y;
+  RoleNode(this.id, {this.x, this.y});
+  bool get hasPosition => x != null && y != null;
+  Map<String, dynamic> toJson() =>
+      hasPosition ? {'id': id, 'x': x, 'y': y} : {'id': id};
+}
+
 class FrameConfig {
   final FigmaLink link;
-  final Map<String, String> nodes;
+  final Map<String, RoleNode> nodes;
   FrameConfig(this.link, this.nodes);
   factory FrameConfig.parse(
     dynamic value, {
     Set<String> roles = const {'background', 'foreground', 'branding'},
+    bool allowPosition = true,
   }) {
     if (value is String) return FrameConfig(FigmaLink.parse(value), {});
     final map = asMap(value, 'figma 画板');
     allowedKeys(map, {'url', 'nodes'}, 'figma 画板');
     final nodes = configMap(map, 'nodes');
     allowedKeys(nodes, roles, 'nodes');
-    final result = <String, String>{};
+    final result = <String, RoleNode>{};
     for (final entry in nodes.entries) {
-      final node = configString(
-        nodes,
-        entry.key,
-        'nodes.${entry.key}',
-      ).replaceAll('-', ':');
+      final label = 'nodes.${entry.key}';
+      final raw = entry.value;
+      String id;
+      double? x, y;
+      if (raw is String) {
+        id = configString(nodes, entry.key, label);
+      } else if (raw is Map) {
+        if (!allowPosition) {
+          throw SplashException('$label 只接受节点 ID 字符串');
+        }
+        final object = asMap(raw, label);
+        allowedKeys(object, {'id', 'x', 'y'}, label);
+        id = configString(object, 'id', '$label.id');
+        final hasX = object.containsKey('x'), hasY = object.containsKey('y');
+        if (hasX != hasY) {
+          throw SplashException('$label 的 x 与 y 必须同时提供或同时省略');
+        }
+        if (hasX) {
+          final rawX = object['x'], rawY = object['y'];
+          if (rawX is! num ||
+              rawY is! num ||
+              !rawX.isFinite ||
+              !rawY.isFinite) {
+            throw SplashException('$label 的 x、y 必须为有限数字');
+          }
+          x = rawX.toDouble();
+          y = rawY.toDouble();
+        }
+      } else {
+        throw SplashException('$label 必须为节点 ID 字符串或含 id 的映射');
+      }
+      final node = id.replaceAll('-', ':');
       if (!RegExp(r'^\d+:\d+$').hasMatch(node)) {
         throw SplashException('无效图层节点：${entry.key}');
       }
-      result[entry.key] = node;
+      result[entry.key] = RoleNode(node, x: x, y: y);
     }
     return FrameConfig(
       FigmaLink.parse(configString(map, 'url', 'figma 画板 url')),
       result,
     );
   }
-  Map<String, dynamic> toJson() => {'link': link.toJson(), 'nodes': nodes};
+  // 未显式指定位置时仍序列化为节点 ID 字符串，保证旧配置的 sourceHash 不变。
+  Map<String, dynamic> toJson() => {
+    'link': link.toJson(),
+    'nodes': {
+      for (final entry in nodes.entries)
+        entry.key: entry.value.hasPosition
+            ? entry.value.toJson()
+            : entry.value.id,
+    },
+  };
 }
 
 class SplashConfig {

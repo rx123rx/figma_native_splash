@@ -121,7 +121,7 @@ Future<IconSnapshot> fetchIcon(FigmaClient api, IconConfig config) async {
   }
   final exports = <String, String>{'icon': link.nodeId};
   for (final role in config.roles) {
-    final id = config.frame.nodes[role];
+    final id = config.frame.nodes[role]?.id;
     final matches = descendants
         .where((n) => id == null ? n['name'] == 'icon/$role' : n['id'] == id)
         .toList();

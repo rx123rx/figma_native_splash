@@ -100,7 +100,7 @@ figma_splash.yaml
 └── splash:                         # 原生启动图，由 sync/create/check/preview 读取
     ├── figma:
     │   ├── phone: <链接 或 url + nodes>          # 必填
-    │   │   └── nodes: { background, foreground, branding }   # 选填，不改图层名时可省
+    │   │   └── nodes: { background, foreground, branding }   # 选填，不改图层名时可省；可写成 id + x/y 引用画板外素材
     │   └── tablet: <同 phone，省略则复用手机稿>    # 选填
     ├── platforms: [android, ios, ohos]           # 按实际存在的平台写
     ├── resource_prefix: figma_splash
@@ -162,6 +162,7 @@ splash:
 | 只生成 Android/iOS（没有鸿蒙目录） | `platforms: [android, ios]`（`icon`、`splash` 各写一份） |
 | 加 Pad 稿 | 新增 `splash.figma.tablet`，省略则复用手机稿 |
 | 不想改 Figma 图层名 | `nodes: { background: "10:1", ... }` |
+| 品牌组合放在画板外的独立分组/组件里 | `nodes.<角色>: { id: "10:3", x: 120, y: 700 }`，用 x/y 指定位置（见 2.6） |
 | 改生成资源的统一前缀 | `resource_prefix`（首次生成后改名会被拒绝，先迁移旧资源） |
 | 原生目录不是标准 Flutter 结构 | `project.*` 各路径，均相对 `--project` |
 | 透明素材出现底色不对 | `background_color`，只接受 `"#RRGGBB"` |
@@ -188,6 +189,30 @@ dart run figma_native_splash:check
 
 首次 `sync` 之前执行 `check/create/preview` 会提示缺少快照，**不会自行联网下载**。改了 Figma 链接、节点映射或增删 Pad 后要重新 `sync`；只改颜色、平台或鸿蒙开关，直接 `create` 即可。
 
+### 2.6 引用画板外素材（可选）
+
+`nodes` 默认指向画板内的可见后代节点。如果某个角色是画板外的可复用素材（例如设计系统里单独维护的「Logo + 名称 + 标语」品牌组合），可以写成对象形式，并用 `x`、`y` 指定该素材左上角在画板内的位置（设计点，画板左上角为 `0,0`）：
+
+```yaml
+splash:
+  figma:
+    phone:
+      url: "https://www.figma.com/design/ExampleFileKey/Launch?node-id=1-2"
+      nodes:
+        background: "10:1"
+        foreground: "10:2"
+        branding:
+          id: "30:1"   # 画板外的品牌组合，也可以是画板内节点
+          x: 125       # 素材左上角在画板内的 x
+          y: 704       # 素材左上角在画板内的 y
+```
+
+- 只在 `splash` 中可用；`icon` 的 `nodes` 仍只接受节点 ID 字符串。
+- `id` 必填，`x` 与 `y` 必须同时出现或同时省略。素材宽高取节点自身尺寸，不做缩放。
+- 同一文件内的画板外素材会被手机、Pad 共用，工具只请求和下载一次。
+- 手机与 Pad 引用**同一个**画板外素材时，两端宽高比天然一致，更容易通过 iOS 的比例校验；两端引用不同素材时，仍需满足对应图层宽高比差 ≤2%。
+- 画板外素材同样要求可见；`background` 仍须覆盖完整画板（外部素材的 x/y 与尺寸需自行保证）。
+
 ## 3. Figma 设计稿要求
 
 每个画板应包含以下可见图层，名称区分大小写，角色可以在画板内部嵌套，但必须匹配到唯一节点：
@@ -206,7 +231,7 @@ Launch screen (Frame / Component / Instance)
 - 按逻辑尺寸作图，例如手机 375×812、平板 834×1194；不要把 3x 像素尺寸当成逻辑画板尺寸。工具按 3x 导出 PNG，不依赖开发机安装字体。
 - 手机与 Pad 的对应前景图层应使用相同宽高比。iOS 会检查主视觉/品牌的比例差；超过容差会拒绝生成。
 - 角色容器支持旋转和镜像：位置、尺寸使用变换后的绝对边界，PNG 使用 Figma 的导出结果，不再二次旋转或翻转。导出图片比例必须与该边界一致，否则报错；背景仍须覆盖完整画板。
-- 隐藏、重复的角色容器、画板外节点映射、背景边界不符都会报错。显式指定的节点必须是该画板内的可见后代。
+- 隐藏、重复的角色容器、背景边界不符都会报错。显式指定的节点默认必须是该画板内的可见后代；需要引用画板外素材时，用 `nodes.<角色>: { id, x, y }` 指定它在画板中的位置（见 2.6）。
 - 只支持 Design 文件（`/design/`、`/file/`），不支持 FigJam、Slides、Make 或分享链接跳转。分支链接会使用分支文件 ID；节点 ID 可使用 `1-2` 或 `1:2`。
 
 更详细的设计约束见 [Figma 模板规范](doc/figma-template.md)。工具只读取 Figma，不重命名图层、不修改设计稿，也不根据图片内容猜测角色。
@@ -407,6 +432,8 @@ figma_splash.yaml
 | 没有设计快照 | 先在正确项目目录执行 `sync` |
 | 找不到画板或图层 | 检查文件权限、node-id、隐藏图层和映射所在画板 |
 | 匹配到 0 个或多个图层 | 使用精确的 `splash/<角色>` 名称，或指定唯一节点 ID |
+| `... 不在画板内；请改用画板内节点，或在 nodes.<角色> 中提供 x、y ...` | 角色引用了画板外的素材；把 `nodes.<角色>` 写成 `{ id, x, y }` 对象，或改用画板内节点 |
+| `... 不存在或无权访问` / `... 不可见` | 检查画板外素材的节点 ID、可见性和账号权限 |
 | 背景容器边界不符 | 在 Figma 中用覆盖画板的容器包裹背景，不用孤立的光晕节点当整个背景 |
 | iOS 对应图层比例不同 | 将手机/Pad 的主视觉、品牌按相同比例组织，再同步 |
 | 找不到 LaunchTheme / Info.plist / Ability | 检查 `platforms` 和 `project` 路径，先创建对应原生工程 |
@@ -562,8 +589,10 @@ splash:
         # 导出主文案及装饰；图片保持宽高比，不能混入状态栏截图。
         foreground: "10:2"
 
-        # 选填，字符串节点 ID。
-        # 省略：查找唯一可见的 splash/branding 图层。
+        # 选填。可写节点 ID 字符串；也可写成对象引用画板外的可复用素材：
+        #   branding: { id: "10:3", x: 120, y: 700 }
+        # 对象写法下 id 必填，x、y 同时给出，表示素材左上角在画板内的位置（设计点）；
+        # 宽高取素材自身尺寸。省略：查找唯一可见的 splash/branding 图层。
         # 导出底部 Logo、名称和标语；不填写 ID 不代表省略品牌图层。
         branding: "10:3"
 

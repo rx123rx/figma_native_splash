@@ -47,6 +47,7 @@ class IconConfig {
     final frame = FrameConfig.parse(
       map['figma'],
       roles: {'background', 'foreground', 'monochrome'},
+      allowPosition: false,
     );
     final platforms = configPlatforms(map, 'icon');
     final prefix = configString(
